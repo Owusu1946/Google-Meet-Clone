@@ -1,17 +1,19 @@
 import Image from 'next/image';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useCall, useConnectedUser } from '@stream-io/video-react-sdk';
 
 import ButtonWithIcon from './ButtonWithIcon';
 import Clipboard from './Clipboard';
 import PersonAdd from './icons/PersonAdd';
 import Popup from './Popup';
+import AddPeoplePopup from './AddPeoplePopup';
 import useLocalStorage from '../hooks/useLocalStorage';
 
 const MeetingPopup = () => {
   const user = useConnectedUser();
   const call = useCall();
   const meetingId = call?.id!;
+  const [showAddPeople, setShowAddPeople] = useState(false);
 
   const [seen, setSeen] = useLocalStorage(`meetingPopupSeen`, {
     [meetingId]: false,
@@ -28,6 +30,17 @@ const MeetingPopup = () => {
       ...seen,
       [meetingId]: true,
     });
+  };
+
+  const handleAddOthers = () => {
+    setShowAddPeople(true);
+  };
+
+  const handleInvite = (selectedEmails: string[]) => {
+    // Here you can implement the actual invite logic
+    // For now, we'll just log the selected emails
+    console.log('Inviting:', selectedEmails);
+    // In production, you might call an API endpoint to send invitations
   };
 
   useEffect(() => {
@@ -59,6 +72,7 @@ const MeetingPopup = () => {
     >
       <div className="p-6 pt-0">
         <ButtonWithIcon
+          onClick={handleAddOthers}
           icon={
             <div className="w-6.5 flex items-center justify-start">
               <PersonAdd />
@@ -92,6 +106,11 @@ const MeetingPopup = () => {
           Joined as {email}
         </div>
       </div>
+      <AddPeoplePopup
+        isOpen={showAddPeople}
+        onClose={() => setShowAddPeople(false)}
+        onInvite={handleInvite}
+      />
     </Popup>
   );
 };
