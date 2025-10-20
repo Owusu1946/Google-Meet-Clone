@@ -21,6 +21,10 @@ import KeyboardFilled from '@/components/icons/KeyboardFilled';
 import PlainButton from '@/components/PlainButton';
 import TextField from '@/components/TextField';
 import Videocall from '@/components/icons/Videocall';
+import NewMeetingDropdown from '@/components/NewMeetingDropdown';
+import MeetingLinkPopup from '@/components/MeetingLinkPopup';
+import Link from '@/components/icons/Link';
+import Add from '@/components/icons/Add';
 
 const generateMeetingId = () => {
   const alphabet = 'abcdefghijklmnopqrstuvwxyz';
@@ -37,6 +41,9 @@ const Home = () => {
   const [code, setCode] = useState('');
   const [checkingCode, setCheckingCode] = useState(false);
   const [error, setError] = useState('');
+  const [showDropdown, setShowDropdown] = useState(false);
+  const [showLinkPopup, setShowLinkPopup] = useState(false);
+  const [generatedMeetingId, setGeneratedMeetingId] = useState('');
   const router = useRouter();
 
   useEffect(() => {
@@ -52,6 +59,16 @@ const Home = () => {
   }, [error]);
 
   const handleNewMeeting = () => {
+    setShowDropdown(!showDropdown);
+  };
+
+  const handleCreateMeetingForLater = () => {
+    const meetingId = generateMeetingId();
+    setGeneratedMeetingId(meetingId);
+    setShowLinkPopup(true);
+  };
+
+  const handleStartInstantMeeting = () => {
     setNewMeeting(true);
     router.push(`/${generateMeetingId()}`);
   };
@@ -103,9 +120,27 @@ const Home = () => {
         <div className="w-full max-w-xl flex justify-center">
           <div className="flex flex-col items-start sm:flex-row gap-6 sm:gap-2 sm:items-center justify-center">
             {isSignedIn && (
-              <ButtonWithIcon onClick={handleNewMeeting} icon={<Videocall />}>
-                New meeting
-              </ButtonWithIcon>
+              <div className="relative">
+                <ButtonWithIcon onClick={handleNewMeeting} icon={<Videocall />}>
+                  New meeting
+                </ButtonWithIcon>
+                <NewMeetingDropdown
+                  isOpen={showDropdown}
+                  onClose={() => setShowDropdown(false)}
+                  options={[
+                    {
+                      icon: <Link />,
+                      label: 'Create a meeting for later',
+                      onClick: handleCreateMeetingForLater,
+                    },
+                    {
+                      icon: <Add />,
+                      label: 'Start an instant meeting',
+                      onClick: handleStartInstantMeeting,
+                    },
+                  ]}
+                />
+              </div>
             )}
             {!isSignedIn && (
               <SignInButton>
@@ -157,6 +192,12 @@ const Home = () => {
             </div>
           </div>
         )}
+        <MeetingLinkPopup
+          isOpen={showLinkPopup}
+          onClose={() => setShowLinkPopup(false)}
+          meetingId={generatedMeetingId}
+          baseUrl={typeof window !== 'undefined' ? window.location.origin : ''}
+        />
         <footer className="w-full max-w-xl mt-20 pb-4 text-start">
           <div className="text-xs text-gray tracking-wider">
             <span className="cursor-pointer">
