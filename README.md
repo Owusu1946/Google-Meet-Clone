@@ -294,5 +294,3 @@ PORT=3001 npm run dev
 ## License
 
 This project is licensed under the [MIT License](LICENSE).
-#   G o o g l e - M e e t - C l o n e  
- 

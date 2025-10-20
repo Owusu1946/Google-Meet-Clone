@@ -1,0 +1,222 @@
+@import url('https://fonts.googleapis.com/css2?family=Google+Sans:wght@100;200;300;400;500;600;700;800;900&family=Google+Sans+Display:wght@100;200;300;400;500;600;700;800;900&&family=Product+Sans:wght@100;200;300;400;500;600;700;800;900&family=Roboto&family=Google+Symbols:opsz,wght,FILL,GRAD@24,400,0,0&family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200&display=swap');
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --primary: #1a73e8;
+    --meet-black: #202124;
+    --icon-blue: #8ab4f7;
+  }
+
+  body {
+    @apply font-google-sans bg-white tracking-looser text-dark-gray;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+}
+
+@layer components {
+
+  .call-control-button,
+  .call-info-button {
+    @apply rounded-full;
+  }
+
+  .call-control-button {
+    @apply !w-10 !h-10 bg-dark-gray !border-dark-gray;
+
+    &:hover {
+      @apply !bg-[#444649];
+    }
+  }
+
+  .call-info-button {
+    @apply !w-12 !h-12 !bg-transparent !border-transparent p-3;
+
+    &:hover {
+      @apply !bg-[#28292c];
+    }
+  }
+
+  .toggle-button-alert,
+  .leave-call-button {
+    @apply !bg-meet-red !border-meet-red;
+
+    &:hover {
+      @apply !bg-hover-red;
+    }
+  }
+
+  .leave-call-button {
+    @apply !w-14;
+  }
+
+  .root-theme .str-video__speech-indicator {
+    gap: 1.5px;
+  }
+
+  .str-video__speech-indicator__bar,
+  .root-theme .str-video__speech-indicator.str-video__speech-indicator--dominant .str-video__speech-indicator__bar,
+  .root-theme .str-video__speech-indicator .str-video__speech-indicator__bar {
+    background-color: white !important;
+    width: 4px !important;
+    border-radius: 999px !important;
+  }
+
+  .root-theme .str-video__paginated-grid-layout,
+  .root-theme .str-video__speaker-layout.str-video__speaker-layout--variant-bottom {
+    height: calc(100% - 5rem);
+    padding: 1rem 1rem 0 1rem;
+  }
+
+  .root-theme .str-video__speaker-layout__wrapper {
+    flex-grow: 0;
+  }
+
+  .root-theme .str-video__speaker-layout .str-video__speaker-layout__participants-bar-wrapper .str-video__speaker-layout__participants-bar .str-video__speaker-layout__participant-tile {
+    min-width: 350px;
+  }
+
+  .root-theme .str-video__speaker-layout__participants-bar-wrapper {
+    @apply min-[896px]:w-full;
+  }
+
+  .root-theme .str-video__speaker-layout__participants-bar {
+    scrollbar-width: none;
+    @apply overflow-y-hidden min-[896px]:flex min-[896px]:justify-center min-[896px]:items-center min-[896px]:w-full;
+  }
+
+  .root-theme .str-video__paginated-grid-layout .str-video__paginated-grid-layout__group,
+  .root-theme .spotlight {
+    max-width: 1316px;
+    max-height: calc(100svh - 6rem);
+    padding: 0;
+    gap: 12px;
+    position: relative;
+  }
+
+  .root-theme .str-video__paginated-grid-layout .str-video__paginated-grid-layout__group:has(> .str-video__participant-view:first-child:nth-last-child(2)) {
+    @apply flex-col min-[500px]:flex-row;
+  }
+
+  .root-theme .str-video__paginated-grid-layout--one .str-video__participant-view .str-video__menu-container,
+  .root-theme .str-video__participant-view:first-child:nth-last-child(2) .str-video__menu-container,
+  .root-theme .str-video__participant-view:first-child:nth-last-child(2)~.str-video__participant-view .str-video__menu-container {
+    max-height: 380px !important;
+  }
+
+  .root-theme .spotlight--one>.str-video__participant-view,
+  .root-theme .str-video__paginated-grid-layout--one .str-video__participant-view {
+    border-radius: 0;
+    max-height: calc(100svh - 6rem);
+    max-width: 1294px;
+    margin: 0 auto;
+  }
+
+  .root-theme .str-video__participant-view {
+    position: relative;
+    @apply animate-delayed-fade-in;
+  }
+
+  .root-theme .str-video__paginated-grid-layout--one .participant-view-placeholder {
+    background: transparent;
+  }
+
+  .root-theme .str-video__paginated-grid-layout--one .speech-ring {
+    box-shadow: none;
+  }
+
+  .root-theme .str-video__participant-view--speaking {
+    outline: none;
+  }
+
+  .root-theme .str-video__paginated-grid-layout--two-four .str-video__participant-view {
+    max-height: calc(calc(100svh - 6rem) / 2 - 6px);
+  }
+
+  .root-theme .str-video__menu-container {
+    background: #303134;
+    box-shadow: 0 1px 2px 0 rgba(0, 0, 0, .3),
+      0 2px 6px 2px rgba(0, 0, 0, .15);
+    border-radius: 4px;
+    max-height: 158px !important;
+  }
+
+  .root-theme .str-video__generic-menu {
+    padding: 8px 0;
+    gap: 4px;
+  }
+
+  .root-theme .str-video__generic-menu--item {
+    background: transparent;
+    border-radius: 0;
+    padding: 0;
+    height: 40px;
+  }
+
+  .root-theme .str-video__generic-menu .str-video__generic-menu--item button {
+    border-radius: 0;
+    background: transparent;
+    color: #e8eaed;
+    padding: 0 16px;
+    height: 100%;
+    font-family: Roboto, Arial, sans-serif;
+    line-height: 1.25rem;
+    font-size: .875rem;
+    letter-spacing: .0142857143em;
+    font-weight: 400;
+  }
+
+  .root-theme .str-video__generic-menu .str-video__generic-menu--item button:hover {
+    background: #37383b;
+  }
+
+  .root-theme .str-video__speaker-layout__participants-bar-buttons-wrapper {
+    overflow: auto;
+  }
+
+  .root-theme .str-video__speaker-layout--variant-bottom .str-video__speaker-layout__participants-bar-wrapper {
+    overflow-x: auto;
+  }
+
+  .root-theme .str-video__screen-share-overlay__title {
+    color: white;
+  }
+
+  .root-theme .str-video__composite-button .str-video__composite-button__button-group {
+    @apply bg-dark-gray w-[2.5rem] h-[2.5rem];
+
+    &:hover {
+      @apply bg-[#444649];
+    }
+
+    & button {
+      @apply w-[2.5rem] h-[2.5rem];
+    }
+  }
+
+  .root-theme .str-video__composite-button__button-group.str-video__composite-button__button-group--active-secondary {
+    @apply bg-meet-red;
+
+    &:hover {
+      @apply bg-hover-red;
+    }
+  }
+
+  .google-symbols {
+    font-variation-settings: "FILL" 0, "wght" 400, "GRAD" 0, "opsz" 24;
+    color: white;
+  }
+
+  .material-symbols-outlined {
+    font-variation-settings: "FILL" 0, "wght" 400, "GRAD" 0, "opsz" 24;
+  }
+}
+
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+}
