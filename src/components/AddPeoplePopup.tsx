@@ -1,6 +1,7 @@
 'use client';
 import { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
+import Image from 'next/image';
 import clsx from 'clsx';
 
 import Close from './icons/Close';
@@ -93,14 +94,13 @@ const AddPeoplePopup = ({ isOpen, onClose, onInvite }: AddPeoplePopupProps) => {
     return colors[index];
   };
 
-  if (!isOpen) return null;
-
   const [mounted, setMounted] = useState(false);
+  
   useEffect(() => {
     setMounted(true);
   }, []);
 
-  if (!mounted) return null;
+  if (!isOpen || !mounted) return null;
 
   return createPortal(
     <>
@@ -171,10 +171,12 @@ const AddPeoplePopup = ({ isOpen, onClose, onInvite }: AddPeoplePopupProps) => {
                 )}
               >
                 {contact.avatar ? (
-                  <img
+                  <Image
                     src={contact.avatar}
                     alt={contact.name}
-                    className="w-full h-full rounded-full object-cover"
+                    width={40}
+                    height={40}
+                    className="rounded-full object-cover"
                   />
                 ) : (
                   getInitials(contact.name)

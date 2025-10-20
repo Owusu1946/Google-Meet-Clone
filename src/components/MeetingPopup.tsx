@@ -68,7 +68,7 @@ const MeetingPopup = () => {
       <Popup
         open={!seen[meetingId]}
         onClose={onClose}
-        title={<h2>Your meeting's ready</h2>}
+        title={<h2>Your meeting&apos;s ready</h2>}
         className="bottom-0 -translate-y-22.5 animate-popup"
       >
         <div className="p-6 pt-0">

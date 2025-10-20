@@ -46,7 +46,7 @@ const MeetingLinkPopup = ({
         {/* Header */}
         <div className="flex items-center justify-between px-6 pt-6 pb-4">
           <h2 className="text-xl font-medium text-meet-black">
-            Here's your joining info
+            Here&apos;s your joining info
           </h2>
           <button
             onClick={onClose}
