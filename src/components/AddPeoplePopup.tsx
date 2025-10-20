@@ -1,5 +1,6 @@
 'use client';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 import clsx from 'clsx';
 
 import Close from './icons/Close';
@@ -94,7 +95,14 @@ const AddPeoplePopup = ({ isOpen, onClose, onInvite }: AddPeoplePopupProps) => {
 
   if (!isOpen) return null;
 
-  return (
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  if (!mounted) return null;
+
+  return createPortal(
     <>
       {/* Backdrop */}
       <div
@@ -102,8 +110,10 @@ const AddPeoplePopup = ({ isOpen, onClose, onInvite }: AddPeoplePopupProps) => {
         onClick={onClose}
       />
 
-      {/* Modal */}
-      <div className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-50 bg-white rounded-lg shadow-2xl w-[90%] max-w-md animate-scale-in">
+      {/* Modal Wrapper */}
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-4 pointer-events-none">
+        {/* Modal */}
+        <div className="bg-white rounded-lg shadow-2xl w-full max-w-md pointer-events-auto">
         {/* Header */}
         <div className="flex items-center justify-between px-6 pt-6 pb-4 border-b border-gray-200">
           <h2 className="text-xl font-medium text-meet-black">Add people</h2>
@@ -213,8 +223,10 @@ const AddPeoplePopup = ({ isOpen, onClose, onInvite }: AddPeoplePopupProps) => {
             Invite ({selectedContacts.size})
           </button>
         </div>
+        </div>
       </div>
-    </>
+    </>,
+    document.body
   );
 };
 

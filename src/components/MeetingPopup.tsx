@@ -64,54 +64,56 @@ const MeetingPopup = () => {
   }, []);
 
   return (
-    <Popup
-      open={!seen[meetingId]}
-      onClose={onClose}
-      title={<h2>Your meeting&apos;s ready</h2>}
-      className="bottom-0 -translate-y-22.5 animate-popup"
-    >
-      <div className="p-6 pt-0">
-        <ButtonWithIcon
-          onClick={handleAddOthers}
-          icon={
-            <div className="w-6.5 flex items-center justify-start">
-              <PersonAdd />
+    <>
+      <Popup
+        open={!seen[meetingId]}
+        onClose={onClose}
+        title={<h2>Your meeting's ready</h2>}
+        className="bottom-0 -translate-y-22.5 animate-popup"
+      >
+        <div className="p-6 pt-0">
+          <ButtonWithIcon
+            onClick={handleAddOthers}
+            icon={
+              <div className="w-6.5 flex items-center justify-start">
+                <PersonAdd />
+              </div>
+            }
+            rounding="lg"
+            size="sm"
+            variant="secondary"
+          >
+            Add others
+          </ButtonWithIcon>
+          <div className="mt-2 text-dark-gray text-sm font-roboto tracking-looserst">
+            Or share this meeting link with others you want in the meeting
+          </div>
+          <div className="mt-2">
+            <Clipboard value={clipboardValue} />
+          </div>
+          <div className="my-4 flex items-center gap-2">
+            <Image
+              width={26}
+              height={26}
+              alt="Your meeting is safe"
+              src="https://www.gstatic.com/meet/security_shield_with_background_2f8144e462c57b3e56354926e0cda615.svg"
+            />
+            <div className="text-xs font-roboto text-meet-gray tracking-wide">
+              People who use this meeting link must get your permission before
+              they can join.
             </div>
-          }
-          rounding="lg"
-          size="sm"
-          variant="secondary"
-        >
-          Add others
-        </ButtonWithIcon>
-        <div className="mt-2 text-dark-gray text-sm font-roboto tracking-looserst">
-          Or share this meeting link with others you want in the meeting
-        </div>
-        <div className="mt-2">
-          <Clipboard value={clipboardValue} />
-        </div>
-        <div className="my-4 flex items-center gap-2">
-          <Image
-            width={26}
-            height={26}
-            alt="Your meeting is safe"
-            src="https://www.gstatic.com/meet/security_shield_with_background_2f8144e462c57b3e56354926e0cda615.svg"
-          />
+          </div>
           <div className="text-xs font-roboto text-meet-gray tracking-wide">
-            People who use this meeting link must get your permission before
-            they can join.
+            Joined as {email}
           </div>
         </div>
-        <div className="text-xs font-roboto text-meet-gray tracking-wide">
-          Joined as {email}
-        </div>
-      </div>
+      </Popup>
       <AddPeoplePopup
         isOpen={showAddPeople}
         onClose={() => setShowAddPeople(false)}
         onInvite={handleInvite}
       />
-    </Popup>
+    </>
   );
 };
 
