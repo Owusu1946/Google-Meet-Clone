@@ -5,6 +5,7 @@ import FloatingReaction from './FloatingReaction';
 interface Reaction {
   id: string;
   emoji: string;
+  senderName?: string;
 }
 
 interface ReactionOverlayProps {
@@ -23,6 +24,7 @@ const ReactionOverlay = ({
           key={reaction.id}
           id={reaction.id}
           emoji={reaction.emoji}
+          senderName={reaction.senderName}
           onComplete={onReactionComplete}
         />
       ))}
@@ -36,9 +38,9 @@ export default ReactionOverlay;
 export const useReactions = () => {
   const [reactions, setReactions] = useState<Reaction[]>([]);
 
-  const addReaction = useCallback((emoji: string) => {
+  const addReaction = useCallback((emoji: string, senderName?: string) => {
     const id = `${Date.now()}-${Math.random()}`;
-    setReactions((prev) => [...prev, { id, emoji }]);
+    setReactions((prev) => [...prev, { id, emoji, senderName }]);
   }, []);
 
   const removeReaction = useCallback((id: string) => {

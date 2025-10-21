@@ -39,6 +39,8 @@ import VisualEffects from '@/components/icons/VisualEffects';
 import { useVirtualBackground } from '@/hooks/useVirtualBackground';
 import CaptionsOverlay from '@/components/CaptionsOverlay';
 import useLiveCaptions from '@/hooks/useLiveCaptions';
+import HandRaiseOverlay from '@/components/HandRaiseOverlay';
+import BackHand from '@/components/icons/BackHand';
 import useTime from '@/hooks/useTime';
 
 interface MeetingProps {
@@ -69,6 +71,7 @@ const Meeting = ({ params }: MeetingProps) => {
   const [isBackgroundSelectorOpen, setIsBackgroundSelectorOpen] = useState(false);
   const { reactions, addReaction, removeReaction } = useReactions();
   const { selectedBackground, applyBackground } = useVirtualBackground();
+  const [raisedUserIds, setRaisedUserIds] = useState<string[]>([]);
   const {
     supported: captionsSupported,
     listening: captionsOn,
@@ -89,19 +92,77 @@ const Meeting = ({ params }: MeetingProps) => {
       if (isUnkownOrIdle) {
         router.push(`/${meetingId}`);
       } else if (chatClient) {
+        const uid = user?.id || chatClient.user?.id;
+        // Create/get the shared channel for this meeting (no members filter to allow all users)
         const channel = chatClient.channel('messaging', meetingId);
+        try {
+          // Watch creates the channel if it doesn't exist and subscribes to events
+          await channel.watch();
+          console.log('Channel watched successfully for meeting:', meetingId);
+        } catch (e) {
+          console.error('Failed to watch channel:', e);
+        }
+        // Ensure current user is added as a member
+        if (uid) {
+          try {
+            await channel.addMembers([uid]);
+            console.log('User added to channel:', uid);
+          } catch (e) {
+            // Likely already a member, which is fine
+            console.log('User already in channel or permission denied:', uid);
+          }
+        }
         setChatChannel(channel);
       }
     };
     startup();
-  }, [router, meetingId, isUnkownOrIdle, chatClient]);
+  }, [router, meetingId, isUnkownOrIdle, chatClient, user?.id]);
+
+  // Subscribe to hand raise/lower and reaction events on chat channel
+  useEffect(() => {
+    if (!chatChannel) return;
+    const handler = (e: any) => {
+      const uid = e.user?.id || e.user_id;
+      const me = user?.id;
+      if (!uid) return;
+      
+      // Handle hand raise/lower events
+      if (e.type === 'hand_raise') {
+        console.log('Hand raise event from', uid);
+        if (uid !== me) { // Skip own events (handled optimistically)
+          setRaisedUserIds((prev) => {
+            if (prev.includes(uid)) return prev; // Avoid duplicates
+            return [...prev, uid];
+          });
+        }
+      } else if (e.type === 'hand_lower') {
+        console.log('Hand lower event from', uid);
+        if (uid !== me) {
+          setRaisedUserIds((prev) => prev.filter((id) => id !== uid));
+        }
+      } else if (e.type === 'reaction_sent' && e.emoji) {
+        // Handle reaction events from other users
+        const senderName = e.sender_name || e.user?.name || 'Someone';
+        console.log('Reaction event:', e.emoji, 'from', senderName);
+        addReaction(e.emoji, senderName);
+      }
+    };
+    chatChannel.on(handler);
+    return () => {
+      chatChannel.off(handler);
+    };
+  }, [chatChannel, user?.id, addReaction]);
 
   useEffect(() => {
     if (participants.length > prevParticipantsCount) {
       audioRef.current?.play();
-      setPrevParticipantsCount(participants.length);
     }
-  }, [participants.length, prevParticipantsCount]);
+    setPrevParticipantsCount(participants.length);
+    
+    // Remove raised hands for users who left the call
+    const currentUserIds = new Set(participants.map(p => p.userId));
+    setRaisedUserIds((prev) => prev.filter((id) => currentUserIds.has(id)));
+  }, [participants.length, prevParticipantsCount, participants]);
 
   const isSpeakerLayout = useMemo(() => {
     if (participantInSpotlight) {
@@ -138,8 +199,23 @@ const Meeting = ({ params }: MeetingProps) => {
     setIsReactionPickerOpen((prev) => !prev);
   };
 
-  const handleSendReaction = (emoji: string) => {
-    addReaction(emoji);
+  const handleSendReaction = async (emoji: string) => {
+    // Add locally with 'You' as sender name (optimistic update)
+    addReaction(emoji, 'You');
+    
+    // Broadcast to other participants with sender name
+    if (chatChannel && user) {
+      try {
+        await chatChannel.sendEvent({ 
+          type: 'reaction_sent',
+          emoji: emoji,
+          sender_name: user.name || user.id
+        } as any);
+        console.log('Reaction broadcast:', emoji, 'from', user.name);
+      } catch (e) {
+        console.error('Failed to broadcast reaction:', e);
+      }
+    }
   };
 
   const toggleBackgroundSelector = () => {
@@ -152,6 +228,35 @@ const Meeting = ({ params }: MeetingProps) => {
     } else {
       stopCaptions();
       clearCaptions();
+    }
+  };
+
+  const toggleHandRaise = async () => {
+    const me = user?.id;
+    if (!me || !chatChannel) {
+      console.log('Cannot toggle hand: missing user or channel');
+      return;
+    }
+    
+    const isRaised = raisedUserIds.includes(me);
+    const eventType = isRaised ? 'hand_lower' : 'hand_raise';
+    
+    console.log('Toggling hand:', eventType, 'for user:', me);
+    
+    // Optimistic UI update
+    setRaisedUserIds((prev) =>
+      isRaised ? prev.filter((id) => id !== me) : [...prev, me]
+    );
+    
+    try {
+      await chatChannel.sendEvent({ type: eventType } as any);
+      console.log('Hand event sent successfully:', eventType);
+    } catch (e) {
+      // Revert if send fails
+      setRaisedUserIds((prev) =>
+        isRaised ? [...prev, me] : prev.filter((id) => id !== me)
+      );
+      console.error('Failed to send hand event:', e);
     }
   };
 
@@ -175,6 +280,12 @@ const Meeting = ({ params }: MeetingProps) => {
           <div className="relative flex grow shrink basis-1/4 items-center justify-center px-1.5 gap-3 ml-0">
             <ToggleAudioButton />
             <ToggleVideoButton />
+            <CallControlButton
+              onClick={toggleHandRaise}
+              icon={<BackHand />}
+              title={raisedUserIds.includes(user?.id || '') ? 'Lower hand' : 'Raise hand'}
+              active={raisedUserIds.includes(user?.id || '')}
+            />
             <div className="hidden sm:block relative">
               <CallControlButton
                 onClick={toggleBackgroundSelector}
@@ -253,6 +364,7 @@ const Meeting = ({ params }: MeetingProps) => {
         {captionsOn && (
           <CaptionsOverlay lines={captionLines} interimText={captionInterim} />
         )}
+        <HandRaiseOverlay raisedUserIds={raisedUserIds} />
         <ReactionOverlay
           reactions={reactions}
           onReactionComplete={removeReaction}

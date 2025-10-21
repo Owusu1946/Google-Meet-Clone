@@ -5,11 +5,13 @@ import { gsap } from 'gsap';
 interface FloatingReactionProps {
   emoji: string;
   id: string;
+  senderName?: string;
   onComplete: (id: string) => void;
 }
 
-const FloatingReaction = ({ emoji, id, onComplete }: FloatingReactionProps) => {
+const FloatingReaction = ({ emoji, id, senderName, onComplete }: FloatingReactionProps) => {
   const reactionRef = useRef<HTMLDivElement>(null);
+  const badgeRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!reactionRef.current) return;
@@ -46,8 +48,17 @@ const FloatingReaction = ({ emoji, id, onComplete }: FloatingReactionProps) => {
         scale: 0.8,
         duration: 2.5,
         ease: 'power1.inOut',
-      })
-      .progress(0.001); // Start slightly delayed for stagger effect
+      });
+    
+    // Animate badge separately with fade out
+    if (badgeRef.current && senderName) {
+      tl.to(badgeRef.current, {
+        opacity: 0,
+        duration: 0.4,
+      }, '-=2.1');
+    }
+    
+    tl.progress(0.001); // Start slightly delayed for stagger effect
 
     return () => {
       tl.kill();
@@ -57,12 +68,24 @@ const FloatingReaction = ({ emoji, id, onComplete }: FloatingReactionProps) => {
   return (
     <div
       ref={reactionRef}
-      className="fixed pointer-events-none z-50 text-5xl select-none"
-      style={{
-        textShadow: '0 2px 8px rgba(0,0,0,0.3)',
-      }}
+      className="fixed pointer-events-none z-50 select-none flex flex-col items-center gap-1"
     >
-      {emoji}
+      <div
+        className="text-5xl"
+        style={{
+          textShadow: '0 2px 8px rgba(0,0,0,0.3)',
+        }}
+      >
+        {emoji}
+      </div>
+      {senderName && (
+        <div
+          ref={badgeRef}
+          className="px-2.5 py-0.5 rounded-full bg-[rgba(0,0,0,0.55)] backdrop-blur-sm text-white text-xs font-medium ring-1 ring-white/10 shadow-lg"
+        >
+          {senderName}
+        </div>
+      )}
     </div>
   );
 };
