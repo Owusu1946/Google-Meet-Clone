@@ -18,7 +18,9 @@ import SpeechIndicator from './SpeechIndicator';
 import Videocam from './icons/Videocam';
 import VideocamOff from './icons/VideocamOff';
 import VisualEffects from './icons/VisualEffects';
+import BackgroundSelector from './BackgroundSelector';
 import useSoundDetected from '../hooks/useSoundDetected';
+import { useVirtualBackground } from '../hooks/useVirtualBackground';
 
 const MeetingPreview = () => {
   const user = useConnectedUser();
@@ -26,6 +28,9 @@ const MeetingPreview = () => {
   const [videoPreviewText, setVideoPreviewText] = useState('');
   const [displaySelectors, setDisplaySelectors] = useState(false);
   const [devicesEnabled, setDevicesEnabled] = useState(false);
+  const [isBackgroundSelectorOpen, setIsBackgroundSelectorOpen] = useState(false);
+  const { selectedBackground, applyBackground, getBackgroundStyles } =
+    useVirtualBackground();
   const { useCameraState, useMicrophoneState } = useCallStateHooks();
   const {
     camera,
@@ -95,7 +100,10 @@ const MeetingPreview = () => {
     <div className="w-full max-w-3xl lg:pr-2 lg:mt-8">
       <div className="relative w-full rounded-lg max-w-185 aspect-video mx-auto shadow-md">
         {/* Background */}
-        <div className="absolute z-0 left-0 w-full h-full rounded-lg bg-meet-black" />
+        <div
+          className="absolute z-0 left-0 w-full h-full rounded-lg bg-meet-black transition-all duration-300"
+          style={getBackgroundStyles()}
+        />
         {/* Gradient overlay */}
         <div className="absolute z-2 bg-gradient-overlay left-0 w-full h-full rounded-lg" />
         {/* Video preview */}
@@ -151,9 +159,16 @@ const MeetingPreview = () => {
             </div>
             <div className="z-3 absolute bottom-4 right-2.5">
               <IconButton
+                onClick={() => setIsBackgroundSelectorOpen((prev) => !prev)}
                 icon={<VisualEffects />}
                 title="Apply visual effects"
                 variant="secondary"
+              />
+              <BackgroundSelector
+                isOpen={isBackgroundSelectorOpen}
+                onClose={() => setIsBackgroundSelectorOpen(false)}
+                onSelectBackground={applyBackground}
+                selectedId={selectedBackground.id}
               />
             </div>
           </>

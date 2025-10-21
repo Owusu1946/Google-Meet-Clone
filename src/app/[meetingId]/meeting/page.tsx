@@ -32,6 +32,13 @@ import RecordingsPopup from '@/components/RecordingsPopup';
 import SpeakerLayout from '@/components/SpeakerLayout';
 import ToggleAudioButton from '@/components/ToggleAudioButton';
 import ToggleVideoButton from '@/components/ToggleVideoButton';
+import ReactionOverlay, { useReactions } from '@/components/ReactionOverlay';
+import ReactionPicker from '@/components/ReactionPicker';
+import BackgroundSelector from '@/components/BackgroundSelector';
+import VisualEffects from '@/components/icons/VisualEffects';
+import { useVirtualBackground } from '@/hooks/useVirtualBackground';
+import CaptionsOverlay from '@/components/CaptionsOverlay';
+import useLiveCaptions from '@/hooks/useLiveCaptions';
 import useTime from '@/hooks/useTime';
 
 interface MeetingProps {
@@ -58,6 +65,19 @@ const Meeting = ({ params }: MeetingProps) => {
     useState<Channel<DefaultStreamChatGenerics>>();
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [isRecordingListOpen, setIsRecordingListOpen] = useState(false);
+  const [isReactionPickerOpen, setIsReactionPickerOpen] = useState(false);
+  const [isBackgroundSelectorOpen, setIsBackgroundSelectorOpen] = useState(false);
+  const { reactions, addReaction, removeReaction } = useReactions();
+  const { selectedBackground, applyBackground } = useVirtualBackground();
+  const {
+    supported: captionsSupported,
+    listening: captionsOn,
+    lines: captionLines,
+    interimText: captionInterim,
+    start: startCaptions,
+    stop: stopCaptions,
+    clear: clearCaptions,
+  } = useLiveCaptions();
   const [participantInSpotlight, _] = participants;
   const [prevParticipantsCount, setPrevParticipantsCount] = useState(0);
   const isCreator = call?.state.createdBy?.id === user?.id;
@@ -114,6 +134,27 @@ const Meeting = ({ params }: MeetingProps) => {
     setIsRecordingListOpen((prev) => !prev);
   };
 
+  const toggleReactionPicker = () => {
+    setIsReactionPickerOpen((prev) => !prev);
+  };
+
+  const handleSendReaction = (emoji: string) => {
+    addReaction(emoji);
+  };
+
+  const toggleBackgroundSelector = () => {
+    setIsBackgroundSelectorOpen((prev) => !prev);
+  };
+
+  const toggleCaptions = () => {
+    if (!captionsOn) {
+      startCaptions();
+    } else {
+      stopCaptions();
+      clearCaptions();
+    }
+  };
+
   if (isUnkownOrIdle) return null;
 
   return (
@@ -134,15 +175,39 @@ const Meeting = ({ params }: MeetingProps) => {
           <div className="relative flex grow shrink basis-1/4 items-center justify-center px-1.5 gap-3 ml-0">
             <ToggleAudioButton />
             <ToggleVideoButton />
+            <div className="hidden sm:block relative">
+              <CallControlButton
+                onClick={toggleBackgroundSelector}
+                icon={<VisualEffects />}
+                title={'Apply visual effects'}
+              />
+              <BackgroundSelector
+                isOpen={isBackgroundSelectorOpen}
+                onClose={() => setIsBackgroundSelectorOpen(false)}
+                onSelectBackground={applyBackground}
+                selectedId={selectedBackground.id}
+              />
+            </div>
             <CallControlButton
+              onClick={toggleCaptions}
               icon={<ClosedCaptions />}
-              title={'Turn on captions'}
-            />
-            <CallControlButton
-              icon={<Mood />}
-              title={'Send a reaction'}
+              title={captionsOn ? 'Turn off captions' : 'Turn on captions'}
+              active={captionsOn}
+              alert={!captionsSupported}
               className="hidden sm:inline-flex"
             />
+            <div className="hidden sm:block relative">
+              <CallControlButton
+                onClick={toggleReactionPicker}
+                icon={<Mood />}
+                title={'Send a reaction'}
+              />
+              <ReactionPicker
+                isOpen={isReactionPickerOpen}
+                onClose={() => setIsReactionPickerOpen(false)}
+                onSelectReaction={handleSendReaction}
+              />
+            </div>
             <CallControlButton
               onClick={toggleScreenShare}
               icon={<PresentToAll />}
@@ -184,6 +249,13 @@ const Meeting = ({ params }: MeetingProps) => {
           channel={chatChannel!}
           isOpen={isChatOpen}
           onClose={() => setIsChatOpen(false)}
+        />
+        {captionsOn && (
+          <CaptionsOverlay lines={captionLines} interimText={captionInterim} />
+        )}
+        <ReactionOverlay
+          reactions={reactions}
+          onReactionComplete={removeReaction}
         />
         {isCreator && <MeetingPopup />}
         <audio
