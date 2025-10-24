@@ -12,7 +12,7 @@ import {
 import Image from 'next/image';
 import clsx from 'clsx';
 
-import { API_KEY, CALL_TYPE } from '@/contexts/MeetProvider';
+import { API_KEY, CALL_TYPE, tokenProvider } from '@/contexts/MeetProvider';
 import { AppContext, MEETING_ID_REGEX } from '@/contexts/AppProvider';
 import Button from '@/components/Button';
 import ButtonWithIcon from '@/components/ButtonWithIcon';
@@ -37,7 +37,7 @@ const GUEST_USER: User = { id: 'guest', type: 'guest' };
 
 const Home = () => {
   const { setNewMeeting } = useContext(AppContext);
-  const { isLoaded, isSignedIn } = useUser();
+  const { isLoaded, isSignedIn, user } = useUser();
   const [code, setCode] = useState('');
   const [checkingCode, setCheckingCode] = useState(false);
   const [error, setError] = useState('');
@@ -62,10 +62,47 @@ const Home = () => {
     setShowDropdown(!showDropdown);
   };
 
-  const handleCreateMeetingForLater = () => {
+  const handleCreateMeetingForLater = async () => {
+    if (!user) return;
     const meetingId = generateMeetingId();
-    setGeneratedMeetingId(meetingId);
-    setShowLinkPopup(true);
+    let client: StreamVideoClient | undefined;
+
+    try {
+      const meetingUser: User = {
+        id: user.id,
+        name: user.fullName || undefined,
+        image: user.hasImage ? user.imageUrl : undefined,
+        custom: {
+          username: user.username || undefined,
+        },
+      };
+
+      client = new StreamVideoClient({
+        apiKey: API_KEY,
+        user: meetingUser,
+        tokenProvider: () => tokenProvider(user.id),
+      });
+
+      const call = client.call(CALL_TYPE, meetingId);
+      await call.create({
+        data: {
+          members: [
+            {
+              user_id: user.id,
+              role: 'host',
+            },
+          ],
+        },
+      });
+
+      setGeneratedMeetingId(meetingId);
+      setShowLinkPopup(true);
+    } catch (err) {
+      console.error(err);
+      setError('Unable to reserve meeting link. Try again.');
+    } finally {
+      await client?.disconnectUser();
+    }
   };
 
   const handleStartInstantMeeting = () => {
