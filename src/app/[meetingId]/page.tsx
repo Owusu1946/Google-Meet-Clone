@@ -62,7 +62,10 @@ const Lobby = ({ params }: LobbyProps) => {
       } catch (e) {
         const err = e as ErrorFromResponse<GetCallResponse>;
         console.error(err.message);
-        setErrorFetchingMeeting(true);
+        if (err.status === 404) {
+          setErrorFetchingMeeting(true);
+        }
+        // For 401/403 and other non-404 errors, proceed without participants
       }
       setLoading(false);
     };
