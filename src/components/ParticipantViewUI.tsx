@@ -4,6 +4,7 @@ import {
   forwardRef,
   ReactNode,
   useState,
+  useEffect,
 } from 'react';
 import {
   DefaultParticipantViewUIProps,
@@ -29,6 +30,8 @@ import MicOffFilled from './icons/MicOffFilled';
 import SpeechIndicator from './SpeechIndicator';
 import VisualEffects from './icons/VisualEffects';
 import MoreVert from './icons/MoreVert';
+import BackHand from './icons/BackHand';
+import { useRaisedHands } from '@/contexts/RaisedHandsContext';
 
 export const speechRingClassName = 'speech-ring';
 export const menuOverlayClassName = 'menu-overlay';
@@ -148,18 +151,69 @@ const ParticipantDetails = ({}: Pick<
   const { participant } = useParticipantViewContext();
   const { pin, name, userId } = participant;
   const pinned = !!pin;
+  const { raisedUserIds } = useRaisedHands();
+  const isRaised = raisedUserIds.includes(userId);
+  const [expanded, setExpanded] = useState(false);
+  const [visible, setVisible] = useState(false);
+
+  // Morph animation: start as circular icon and expand into pill with text
+  // On lower: collapse back to circular then hide
+  useEffect(() => {
+    if (isRaised) {
+      setVisible(true);
+      setExpanded(false);
+      const id = window.setTimeout(() => setExpanded(true), 60);
+      return () => window.clearTimeout(id);
+    } else {
+      setExpanded(false);
+      const id = window.setTimeout(() => setVisible(false), 360);
+      return () => window.clearTimeout(id);
+    }
+  }, [isRaised]);
 
   return (
     <>
       <div className="z-1 absolute left-0 bottom-[.65rem] max-w-94 h-fit truncate font-medium text-white text-sm flex items-center justify-start gap-4 mt-1.5 mx-4 mb-0 cursor-default select-none">
         {pinned && (pin.isLocalPin ? <KeepFilled /> : <KeepPublicFilled />)}
-        <span
-          style={{
-            textShadow: '0 1px 2px rgba(0,0,0,.6), 0 0 2px rgba(0,0,0,.3)',
-          }}
-        >
-          {name || userId}
-        </span>
+        {visible ? (
+          <span
+            className={
+              `inline-flex items-center bg-green-400 text-meet-black rounded-full transform ` +
+              `h-7 transition-all duration-400 ` +
+              `${expanded ? 'px-3 gap-2 scale-100' : 'w-7 justify-center px-0 scale-95'}`
+            }
+            title="Hand raised"
+            style={{
+              transitionTimingFunction: expanded
+                ? 'cubic-bezier(0.18, 0.89, 0.32, 1.28)'
+                : 'cubic-bezier(0.4, 0, 1, 1)',
+            }}
+          >
+            <span className="w-4 h-4 flex items-center justify-center">
+              <BackHand />
+            </span>
+            <span
+              className={
+                `font-medium whitespace-nowrap transition-opacity duration-300 ease-out ` +
+                `${expanded ? 'opacity-100' : 'opacity-0'}`
+              }
+              style={{
+                // prevent layout jump during morph
+                overflow: 'hidden',
+              }}
+            >
+              {name || userId}
+            </span>
+          </span>
+        ) : (
+          <span
+            style={{
+              textShadow: '0 1px 2px rgba(0,0,0,.6), 0 0 2px rgba(0,0,0,.3)',
+            }}
+          >
+            {name || userId}
+          </span>
+        )}
       </div>
     </>
   );

@@ -36,11 +36,13 @@ import ReactionOverlay, { useReactions } from '@/components/ReactionOverlay';
 import ReactionPicker from '@/components/ReactionPicker';
 import BackgroundSelector from '@/components/BackgroundSelector';
 import VisualEffects from '@/components/icons/VisualEffects';
+import PeoplePopup from '@/components/PeoplePopup';
 import CaptionsOverlay from '@/components/CaptionsOverlay';
 import useLiveCaptions from '@/hooks/useLiveCaptions';
 import HandRaiseOverlay from '@/components/HandRaiseOverlay';
 import BackHand from '@/components/icons/BackHand';
 import useTime from '@/hooks/useTime';
+import { RaisedHandsProvider } from '@/contexts/RaisedHandsContext';
 
 interface MeetingProps {
   params: {
@@ -65,6 +67,7 @@ const Meeting = ({ params }: MeetingProps) => {
   const [chatChannel, setChatChannel] =
     useState<Channel<DefaultStreamChatGenerics>>();
   const [isChatOpen, setIsChatOpen] = useState(false);
+  const [isPeopleOpen, setIsPeopleOpen] = useState(false);
   const [isRecordingListOpen, setIsRecordingListOpen] = useState(false);
   const [isReactionPickerOpen, setIsReactionPickerOpen] = useState(false);
   const [isBackgroundSelectorOpen, setIsBackgroundSelectorOpen] = useState(false);
@@ -82,8 +85,28 @@ const Meeting = ({ params }: MeetingProps) => {
   const [participantInSpotlight, _] = participants;
   const [prevParticipantsCount, setPrevParticipantsCount] = useState(0);
   const isCreator = call?.state.createdBy?.id === user?.id;
+  // Prefer Stream's local participant userId as a universal ID (works for guests too)
+  const meId = useMemo(
+    () => call?.state.localParticipant?.userId || user?.id,
+    [call?.state.localParticipant?.userId, user?.id]
+  );
   const isUnkownOrIdle =
     callingState === CallingState.UNKNOWN || callingState === CallingState.IDLE;
+
+  // Sort participants: host first, then alphabetically by display name
+  const sortedParticipants = useMemo(() => {
+    const hostId = call?.state.createdBy?.id;
+    const list = [...participants];
+    return list.sort((a: any, b: any) => {
+      const aId = (a as any).userId || (a as any).user?.id;
+      const bId = (b as any).userId || (b as any).user?.id;
+      if (hostId && aId === hostId && bId !== hostId) return -1;
+      if (hostId && bId === hostId && aId !== hostId) return 1;
+      const aName = ((a as any).name || (a as any).user?.name || aId || '').toString().toLowerCase();
+      const bName = ((b as any).name || (b as any).user?.name || bId || '').toString().toLowerCase();
+      return aName.localeCompare(bName);
+    });
+  }, [participants, call?.state.createdBy?.id]);
 
   useEffect(() => {
     const startup = async () => {
@@ -120,23 +143,41 @@ const Meeting = ({ params }: MeetingProps) => {
   useEffect(() => {
     if (!chatChannel) return;
     const handler = (e: any) => {
-      const uid = e.user?.id || e.user_id;
-      const me = user?.id;
-      if (!uid) return;
-      
+      const uidChat =
+        e.user?.id ||
+        e.user_id ||
+        e.sender?.id ||
+        e.sender_id ||
+        e.created_by?.id ||
+        e.created_by_id;
+      const uidVideo = e.video_user_id; // our canonical user id for tiles
+      const me = meId;
+      if (!uidChat && !uidVideo) {
+        console.warn('[hand] Received event without usable ids', e);
+        return;
+      }
+      console.log('[hand] Event received', {
+        type: e.type,
+        uidChat,
+        uidVideo,
+        me,
+      });
+
+      const canonicalId = uidVideo || uidChat;
+
       // Handle hand raise/lower events
       if (e.type === 'hand_raise') {
-        console.log('Hand raise event from', uid);
-        if (uid !== me) { // Skip own events (handled optimistically)
+        if (canonicalId !== me) { // Skip own events (handled optimistically)
           setRaisedUserIds((prev) => {
-            if (prev.includes(uid)) return prev; // Avoid duplicates
-            return [...prev, uid];
+            if (prev.includes(canonicalId)) return prev; // Avoid duplicates
+            console.log('[hand] Adding raised user', canonicalId, 'prev=', prev);
+            return [...prev, canonicalId];
           });
         }
       } else if (e.type === 'hand_lower') {
-        console.log('Hand lower event from', uid);
-        if (uid !== me) {
-          setRaisedUserIds((prev) => prev.filter((id) => id !== uid));
+        if (canonicalId !== me) {
+          console.log('[hand] Removing raised user', canonicalId);
+          setRaisedUserIds((prev) => prev.filter((id) => id !== canonicalId));
         }
       } else if (e.type === 'reaction_sent' && e.emoji) {
         // Handle reaction events from other users
@@ -156,9 +197,11 @@ const Meeting = ({ params }: MeetingProps) => {
       audioRef.current?.play();
     }
     setPrevParticipantsCount(participants.length);
-    
+
     // Remove raised hands for users who left the call
-    const currentUserIds = new Set(participants.map(p => p.userId));
+    const currentUserIds = new Set(
+      participants.map((p: any) => p.userId || p.user?.id).filter(Boolean)
+    );
     setRaisedUserIds((prev) => prev.filter((id) => currentUserIds.has(id)));
   }, [participants.length, prevParticipantsCount, participants]);
 
@@ -230,16 +273,12 @@ const Meeting = ({ params }: MeetingProps) => {
   };
 
   const toggleHandRaise = async () => {
-    const me = user?.id;
-    if (!me || !chatChannel) {
-      console.log('Cannot toggle hand: missing user or channel');
-      return;
-    }
-    
+    const me = meId;
+    if (!me || !chatChannel) return;
     const isRaised = raisedUserIds.includes(me);
     const eventType = isRaised ? 'hand_lower' : 'hand_raise';
     
-    console.log('Toggling hand:', eventType, 'for user:', me);
+    console.log('[hand] Toggling', { eventType, video_user_id: me, chat_user_id: chatClient?.user?.id });
     
     // Optimistic UI update
     setRaisedUserIds((prev) =>
@@ -247,14 +286,18 @@ const Meeting = ({ params }: MeetingProps) => {
     );
     
     try {
-      await chatChannel.sendEvent({ type: eventType } as any);
-      console.log('Hand event sent successfully:', eventType);
+      await chatChannel.sendEvent({
+        type: eventType,
+        user_id: chatClient?.user?.id,
+        video_user_id: me,
+      } as any);
+      console.log('[hand] Event sent ok');
     } catch (e) {
       // Revert if send fails
       setRaisedUserIds((prev) =>
         isRaised ? [...prev, me] : prev.filter((id) => id !== me)
       );
-      console.error('Failed to send hand event:', e);
+      console.error('[hand] Failed to send event', e);
     }
   };
 
@@ -262,9 +305,11 @@ const Meeting = ({ params }: MeetingProps) => {
 
   return (
     <StreamTheme className="root-theme">
-      <div className="relative w-svw h-svh bg-meet-black overflow-hidden">
-        {isSpeakerLayout && <SpeakerLayout />}
-        {!isSpeakerLayout && <GridLayout />}
+      <div id="meeting-root" className="relative w-svw h-svh bg-meet-black overflow-hidden transition-[padding] duration-300 ease-out">
+        <RaisedHandsProvider value={{ raisedUserIds }}>
+          {isSpeakerLayout && <SpeakerLayout />}
+          {!isSpeakerLayout && <GridLayout />}
+        </RaisedHandsProvider>
         <div className="absolute left-0 bottom-0 right-0 w-full h-20 bg-meet-black text-white text-center flex items-center justify-between">
           {/* Meeting ID */}
           <div className="hidden sm:flex grow shrink basis-1/4 items-center text-start justify-start ml-3 truncate max-w-full">
@@ -342,7 +387,19 @@ const Meeting = ({ params }: MeetingProps) => {
           {/* Meeting Info */}
           <div className="hidden sm:flex grow shrink basis-1/4 items-center justify-end mr-3">
             <CallInfoButton icon={<Info />} title="Meeting details" />
-            <CallInfoButton icon={<Group />} title="People" />
+            <CallInfoButton
+              icon={
+                <div className="relative">
+                  <Group />
+                  <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 rounded-full bg-meet-blue text-white text-[10px] leading-[18px] text-center">
+                    {participants.length}
+                  </span>
+                </div>
+              }
+              title="People"
+              active={isPeopleOpen}
+              onClick={() => setIsPeopleOpen((prev) => !prev)}
+            />
             <CallInfoButton
               onClick={toggleChatPopup}
               icon={
@@ -357,10 +414,16 @@ const Meeting = ({ params }: MeetingProps) => {
           isOpen={isChatOpen}
           onClose={() => setIsChatOpen(false)}
         />
+        <PeoplePopup
+          isOpen={isPeopleOpen}
+          onClose={() => setIsPeopleOpen(false)}
+          participants={sortedParticipants as any}
+          hostId={call?.state.createdBy?.id}
+          raisedUserIds={raisedUserIds}
+        />
         {captionsOn && (
           <CaptionsOverlay lines={captionLines} interimText={captionInterim} />
         )}
-        <HandRaiseOverlay raisedUserIds={raisedUserIds} />
         <ReactionOverlay
           reactions={reactions}
           onReactionComplete={removeReaction}
