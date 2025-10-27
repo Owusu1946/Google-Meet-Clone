@@ -73,6 +73,7 @@ const Meeting = ({ params }: MeetingProps) => {
   const [isReactionPickerOpen, setIsReactionPickerOpen] = useState(false);
   const [isBackgroundSelectorOpen, setIsBackgroundSelectorOpen] = useState(false);
   const [isWhiteboardOpen, setIsWhiteboardOpen] = useState(false);
+  const wbChangeSource = useRef<'local' | 'remote' | null>(null);
   const { reactions, addReaction, removeReaction } = useReactions();
   const [raisedUserIds, setRaisedUserIds] = useState<string[]>([]);
   const {
@@ -181,6 +182,20 @@ const Meeting = ({ params }: MeetingProps) => {
           console.log('[hand] Removing raised user', canonicalId);
           setRaisedUserIds((prev) => prev.filter((id) => id !== canonicalId));
         }
+      } else if (e.type === 'wb_present_start') {
+        // Remote user opened the whiteboard; open locally
+        if (!isWhiteboardOpen) {
+          console.log('[whiteboard] Remote present start by', canonicalId);
+          wbChangeSource.current = 'remote';
+          setIsWhiteboardOpen(true);
+        }
+      } else if (e.type === 'wb_present_stop') {
+        // Remote user closed the whiteboard; close locally if open
+        if (isWhiteboardOpen) {
+          console.log('[whiteboard] Remote present stop by', canonicalId);
+          wbChangeSource.current = 'remote';
+          setIsWhiteboardOpen(false);
+        }
       } else if (e.type === 'reaction_sent' && e.emoji) {
         // Handle reaction events from other users
         const senderName = e.sender_name || e.user?.name || 'Someone';
@@ -192,7 +207,7 @@ const Meeting = ({ params }: MeetingProps) => {
     return () => {
       chatChannel.off(handler);
     };
-  }, [chatChannel, user?.id, addReaction]);
+  }, [chatChannel, user?.id, addReaction, isWhiteboardOpen, meId]);
 
   useEffect(() => {
     if (participants.length > prevParticipantsCount) {
@@ -243,6 +258,7 @@ const Meeting = ({ params }: MeetingProps) => {
   };
 
   const toggleWhiteboard = () => {
+    wbChangeSource.current = 'local';
     setIsWhiteboardOpen((prev) => !prev);
   };
 

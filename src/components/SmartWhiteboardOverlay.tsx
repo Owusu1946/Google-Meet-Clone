@@ -4,6 +4,14 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import clsx from 'clsx';
 import { type Channel as ChannelType } from 'stream-chat';
 import { DefaultStreamChatGenerics } from 'stream-chat-react';
+import Brush from '@/components/icons/Brush';
+import Close from '@/components/icons/Close';
+import Highlighter from '@/components/icons/Highlighter';
+import Eraser from '@/components/icons/Eraser';
+import Undo from '@/components/icons/Undo';
+import Redo from '@/components/icons/Redo';
+import ClearIcon from '@/components/icons/Clear';
+import LinkIcon from '@/components/icons/Link';
 
 // Types for network events over Stream Chat. Namespaced to avoid collisions.
 // All coordinates are in world-space (pre-transform) so pan/zoom is purely client-side.
@@ -94,9 +102,30 @@ const SmartWhiteboardOverlay = ({
   // Local drawing state
   const activeStrokeId = useRef<string | null>(null);
   const isDrawing = useRef(false);
+  // Outgoing batching per animation frame
+  const sendBuffer = useRef<{ strokeId: string; mode: StrokeMode; color: string; width: number; points: Point[] } | null>(null);
+  const rafSend = useRef<number | null>(null);
+  const flushSend = useCallback(() => {
+    rafSend.current = null;
+    if (!chatChannel) return;
+    const buf = sendBuffer.current;
+    if (!buf || buf.points.length === 0) return;
+    const payload: DrawEvent = {
+      type: 'wb_draw',
+      strokeId: buf.strokeId,
+      userId: meId,
+      mode: buf.mode,
+      color: buf.color,
+      width: buf.width,
+      points: buf.points.splice(0, buf.points.length),
+    };
+    chatChannel.sendEvent(payload as any).catch(() => void 0);
+  }, [chatChannel, meId]);
 
   // Remote cursors
   const cursors = useRef<Map<string, { x: number; y: number; ts: number }>>(new Map());
+  const [cursorTick, setCursorTick] = useState(0);
+  const lastCursorSentAt = useRef(0);
 
   // Helpers
   const devicePixelRatioSafe = typeof window !== 'undefined' ? window.devicePixelRatio || 1 : 1;
@@ -127,6 +156,19 @@ const SmartWhiteboardOverlay = ({
       redraw();
     }
   }, [devicePixelRatioSafe]);
+
+  // Prepare remote cursor render list
+  const cursorList = useMemo(() => {
+    const now = Date.now();
+    const items: Array<{ id: string; x: number; y: number }> = [];
+    cursors.current.forEach((v, k) => {
+      if (now - v.ts < 750) {
+        const p = worldToView({ x: v.x, y: v.y });
+        items.push({ id: k, x: p.x, y: p.y });
+      }
+    });
+    return items;
+  }, [cursorTick, worldToView]);
 
   const clearCanvas = useCallback(() => {
     const canvas = canvasRef.current;
@@ -244,20 +286,11 @@ const SmartWhiteboardOverlay = ({
       activeStrokeId.current = id;
       isDrawing.current = true;
       drawStroke(s);
-      if (chatChannel) {
-        const payload: DrawEvent = {
-          type: 'wb_draw',
-          strokeId: id,
-          userId: meId,
-          mode: tool,
-          color,
-          width,
-          points: [pt],
-        };
-        chatChannel.sendEvent(payload as any).catch(() => void 0);
-      }
+      // Initialize send buffer and schedule
+      sendBuffer.current = { strokeId: id, mode: tool, color, width, points: [pt] };
+      if (rafSend.current == null) rafSend.current = requestAnimationFrame(flushSend);
     },
-    [chatChannel, color, drawStroke, meId, tool, width]
+    [color, drawStroke, meId, tool, width, flushSend]
   );
 
   const appendPoint = useCallback(
@@ -268,26 +301,28 @@ const SmartWhiteboardOverlay = ({
       if (!s) return;
       s.points.push(pt);
       drawStroke(s);
-      if (chatChannel) {
-        const payload: DrawEvent = {
-          type: 'wb_draw',
-          strokeId: id,
-          userId: meId,
-          mode: s.mode,
-          color: s.color,
-          width: s.width,
-          points: [pt],
-        };
-        chatChannel.sendEvent(payload as any).catch(() => void 0);
+      // Batch for this frame
+      if (!sendBuffer.current || sendBuffer.current.strokeId !== id) {
+        sendBuffer.current = { strokeId: id, mode: s.mode, color: s.color, width: s.width, points: [] };
       }
+      sendBuffer.current.points.push(pt);
+      if (rafSend.current == null) rafSend.current = requestAnimationFrame(flushSend);
     },
-    [chatChannel, drawStroke, meId]
+    [drawStroke, flushSend]
   );
 
   const endStroke = useCallback(() => {
-    activeStrokeId.current = null;
     isDrawing.current = false;
-  }, []);
+    // Ensure the final buffered points are sent immediately
+    if (rafSend.current != null) {
+      cancelAnimationFrame(rafSend.current);
+      rafSend.current = null;
+    }
+    if (sendBuffer.current && sendBuffer.current.points.length > 0) {
+      flushSend();
+    }
+    activeStrokeId.current = null;
+  }, [flushSend]);
 
   useEffect(() => {
     if (!open) return;
@@ -316,6 +351,14 @@ const SmartWhiteboardOverlay = ({
         setOffset({ x: panOffsetStart.current.x + dx, y: panOffsetStart.current.y + dy });
         redraw();
         return;
+      }
+      const now = performance.now();
+      // Stream cursor at ~20fps
+      if (chatChannel && now - lastCursorSentAt.current > 50) {
+        lastCursorSentAt.current = now;
+        const pt = pointerToWorld(ev);
+        const payload: CursorEvent = { type: 'wb_cursor', userId: meId || undefined, x: pt.x, y: pt.y };
+        chatChannel.sendEvent(payload as any).catch(() => void 0);
       }
       if (!isDrawing.current) return;
       appendPoint(pointerToWorld(ev));
@@ -360,6 +403,11 @@ const SmartWhiteboardOverlay = ({
         drawOrder.current = [];
         undone.current = [];
         redraw();
+      } else if (evt.type === 'wb_cursor') {
+        const c = evt as CursorEvent;
+        if (!c.userId) return;
+        cursors.current.set(c.userId, { x: c.x, y: c.y, ts: Date.now() });
+        setCursorTick((t) => t + 1);
       } else if (evt.type === 'wb_snapshot_request') {
         if (!canvasRef.current) return;
         try {
@@ -408,21 +456,7 @@ const SmartWhiteboardOverlay = ({
     a.click();
   };
 
-  // Simple in-file icons to avoid external deps
-  const IconBrush = () => (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M7 16c.55 0 1 .45 1 1 0 2.21-1.79 4-4 4-.55 0-1-.45-1-1 0-2.21 1.79-4 4-4zm13.71-12.29a.996.996 0 0 0-1.41 0l-7.34 7.34c-.2.2-.33.45-.38.73l-.3 1.52c-.06.33.22.61.55.55l1.52-.3c.28-.05.53-.18.73-.38l7.34-7.34c.39-.39.39-1.02-.01-1.41z"/></svg>
-  );
-  const IconHighlighter = () => (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M3 16l5-5 5 5-5 5H3v-5zm13.5-13c-.28 0-.5.22-.5.5v5l1-1 1 1v-5c0-.28-.22-.5-.5-.5h-1z"/></svg>
-  );
-  const IconEraser = () => (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M16.24 3.56a3 3 0 0 1 4.24 4.24l-9.19 9.19H7.05l-4.24-4.24 9.43-9.19zM3.53 14.12l3.54 3.54H2v-2h1.53z"/></svg>
-  );
-  const IconUndo = () => (<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M12 5V1L7 6l5 5V7c3.31 0 6 2.69 6 6a6 6 0 0 1-6 6H6v2h6a8 8 0 0 0 0-16z"/></svg>);
-  const IconRedo = () => (<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M12 5V1l5 5-5 5V7c-3.31 0-6 2.69-6 6a6 6 0 0 0 6 6h6v2h-6a8 8 0 0 1 0-16z"/></svg>);
-  const IconClear = () => (<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M6 7h12v12a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2V7zm3-4h6l1 2H8l1-2z"/></svg>);
-  const IconDownload = () => (<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M5 20h14v-2H5v2zm7-18l-5 5h3v6h4V7h3l-5-5z"/></svg>);
-  const IconClose = () => (<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>);
+  // Use consistent icon components from the app (Brush, Close). For others, reuse existing shapes (Link/Settings) to avoid odd visuals.
 
   if (!open) return null;
 
@@ -434,6 +468,16 @@ const SmartWhiteboardOverlay = ({
       {/* Board */}
       <div ref={overlayRef} className="absolute inset-6 rounded-xl bg-white shadow-xl overflow-hidden select-none">
         <canvas ref={canvasRef} className="w-full h-full block" />
+        {/* Remote cursors */}
+        <div className="absolute inset-0 pointer-events-none">
+          {cursorList.map((c) => (
+            <div
+              key={c.id}
+              className="absolute -translate-x-1/2 -translate-y-1/2 w-3 h-3 rounded-full bg-emerald-500 shadow-[0_0_0_2px_#fff]"
+              style={{ left: c.x, top: c.y }}
+            />
+          ))}
+        </div>
 
         {/* Toolbar */}
         <div className="absolute top-3 left-3 flex items-center gap-2 bg-[rgba(32,33,36,0.75)] text-white rounded-full p-2 backdrop-blur-md">
@@ -442,21 +486,21 @@ const SmartWhiteboardOverlay = ({
             title="Pen"
             onClick={() => setTool('pen')}
           >
-            <IconBrush />
+            <Brush width={18} height={18} />
           </button>
           <button
             className={clsx('w-9 h-9 rounded-full flex items-center justify-center hover:bg-white/10', tool === 'highlighter' && 'bg-white/10')}
             title="Highlighter"
             onClick={() => setTool('highlighter')}
           >
-            <IconHighlighter />
+            <Highlighter width={18} height={18} />
           </button>
           <button
             className={clsx('w-9 h-9 rounded-full flex items-center justify-center hover:bg-white/10', tool === 'eraser' && 'bg-white/10')}
             title="Eraser"
             onClick={() => setTool('eraser')}
           >
-            <IconEraser />
+            <Eraser width={18} height={18} />
           </button>
 
           <div className="w-px h-6 bg-white/20 mx-1" />
@@ -480,16 +524,16 @@ const SmartWhiteboardOverlay = ({
 
           <div className="w-px h-6 bg-white/20 mx-1" />
           <button className="w-9 h-9 rounded-full flex items-center justify-center hover:bg-white/10" onClick={undo} title="Undo">
-            <IconUndo />
+            <Undo />
           </button>
           <button className="w-9 h-9 rounded-full flex items-center justify-center hover:bg-white/10" onClick={redo} title="Redo">
-            <IconRedo />
+            <Redo />
           </button>
           <button className="w-9 h-9 rounded-full flex items-center justify-center hover:bg-white/10" onClick={clearBoard} title="Clear">
-            <IconClear />
+            <ClearIcon />
           </button>
           <button className="w-9 h-9 rounded-full flex items-center justify-center hover:bg-white/10" onClick={exportPNG} title="Export PNG">
-            <IconDownload />
+            <LinkIcon />
           </button>
         </div>
 
@@ -498,7 +542,7 @@ const SmartWhiteboardOverlay = ({
           className="absolute top-3 right-3 w-9 h-9 rounded-full flex items-center justify-center text-white hover:bg-white/10 bg-[rgba(32,33,36,0.75)]"
           title="Close whiteboard"
         >
-          <IconClose />
+          <Close />
         </button>
 
         {/* Hint */}
