@@ -39,10 +39,11 @@ import VisualEffects from '@/components/icons/VisualEffects';
 import PeoplePopup from '@/components/PeoplePopup';
 import CaptionsOverlay from '@/components/CaptionsOverlay';
 import useLiveCaptions from '@/hooks/useLiveCaptions';
-import HandRaiseOverlay from '@/components/HandRaiseOverlay';
 import BackHand from '@/components/icons/BackHand';
 import useTime from '@/hooks/useTime';
 import { RaisedHandsProvider } from '@/contexts/RaisedHandsContext';
+import SmartWhiteboardOverlay from '@/components/SmartWhiteboardOverlay';
+import Brush from '@/components/icons/Brush';
 
 interface MeetingProps {
   params: {
@@ -71,6 +72,7 @@ const Meeting = ({ params }: MeetingProps) => {
   const [isRecordingListOpen, setIsRecordingListOpen] = useState(false);
   const [isReactionPickerOpen, setIsReactionPickerOpen] = useState(false);
   const [isBackgroundSelectorOpen, setIsBackgroundSelectorOpen] = useState(false);
+  const [isWhiteboardOpen, setIsWhiteboardOpen] = useState(false);
   const { reactions, addReaction, removeReaction } = useReactions();
   const [raisedUserIds, setRaisedUserIds] = useState<string[]>([]);
   const {
@@ -240,6 +242,10 @@ const Meeting = ({ params }: MeetingProps) => {
     setIsReactionPickerOpen((prev) => !prev);
   };
 
+  const toggleWhiteboard = () => {
+    setIsWhiteboardOpen((prev) => !prev);
+  };
+
   const handleSendReaction = async (emoji: string) => {
     // Add locally with 'You' as sender name (optimistic update)
     addReaction(emoji, 'You');
@@ -366,6 +372,12 @@ const Meeting = ({ params }: MeetingProps) => {
               title={'Present now'}
             />
             <RecordCallButton />
+            <CallControlButton
+              onClick={toggleWhiteboard}
+              icon={<Brush />}
+              title={isWhiteboardOpen ? 'Close whiteboard' : 'Open whiteboard'}
+              active={isWhiteboardOpen}
+            />
             <div className="hidden sm:block relative">
               <CallControlButton
                 onClick={toggleRecordingsList}
@@ -420,6 +432,14 @@ const Meeting = ({ params }: MeetingProps) => {
           participants={sortedParticipants as any}
           hostId={call?.state.createdBy?.id}
           raisedUserIds={raisedUserIds}
+        />
+        <SmartWhiteboardOverlay
+          open={isWhiteboardOpen}
+          onClose={() => setIsWhiteboardOpen(false)}
+          chatChannel={chatChannel}
+          meId={meId || user?.id}
+          isPresenter={isCreator}
+          allowCollaboration
         />
         {captionsOn && (
           <CaptionsOverlay lines={captionLines} interimText={captionInterim} />
