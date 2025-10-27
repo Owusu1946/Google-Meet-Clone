@@ -36,7 +36,6 @@ import ReactionOverlay, { useReactions } from '@/components/ReactionOverlay';
 import ReactionPicker from '@/components/ReactionPicker';
 import BackgroundSelector from '@/components/BackgroundSelector';
 import VisualEffects from '@/components/icons/VisualEffects';
-import { useVirtualBackground } from '@/hooks/useVirtualBackground';
 import CaptionsOverlay from '@/components/CaptionsOverlay';
 import useLiveCaptions from '@/hooks/useLiveCaptions';
 import HandRaiseOverlay from '@/components/HandRaiseOverlay';
@@ -70,7 +69,6 @@ const Meeting = ({ params }: MeetingProps) => {
   const [isReactionPickerOpen, setIsReactionPickerOpen] = useState(false);
   const [isBackgroundSelectorOpen, setIsBackgroundSelectorOpen] = useState(false);
   const { reactions, addReaction, removeReaction } = useReactions();
-  const { selectedBackground, applyBackground } = useVirtualBackground();
   const [raisedUserIds, setRaisedUserIds] = useState<string[]>([]);
   const {
     supported: captionsSupported,
@@ -295,8 +293,6 @@ const Meeting = ({ params }: MeetingProps) => {
               <BackgroundSelector
                 isOpen={isBackgroundSelectorOpen}
                 onClose={() => setIsBackgroundSelectorOpen(false)}
-                onSelectBackground={applyBackground}
-                selectedId={selectedBackground.id}
               />
             </div>
             <CallControlButton

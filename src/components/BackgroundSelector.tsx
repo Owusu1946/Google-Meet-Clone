@@ -1,17 +1,15 @@
 'use client';
-import { MutableRefObject } from 'react';
+import { MutableRefObject, useMemo, useState } from 'react';
 import Popup from './Popup';
 import useClickOutside from '../hooks/useClickOutside';
-import {
-  BackgroundOption,
-  BACKGROUND_OPTIONS,
-} from '../hooks/useVirtualBackground';
+import { useBackgroundFilters } from '@stream-io/video-react-sdk';
 import Check from './icons/Check';
 
 interface BackgroundSelectorProps {
   isOpen: boolean;
   onClose: () => void;
-  onSelectBackground: (option: BackgroundOption) => void;
+  // Legacy props (ignored)
+  onSelectBackground?: any;
   selectedId?: string;
 }
 
@@ -25,47 +23,37 @@ const BackgroundSelector = ({
     onClose();
   }, true) as MutableRefObject<HTMLDivElement>;
 
-  const handleBackgroundClick = (option: BackgroundOption) => {
-    onSelectBackground(option);
-  };
+  const {
+    isSupported,
+    isReady,
+    disableBackgroundFilter,
+    applyBackgroundBlurFilter,
+  } = useBackgroundFilters();
 
-  const renderBackgroundPreview = (option: BackgroundOption) => {
-    if (option.type === 'none') {
-      return (
-        <div className="w-full h-full flex items-center justify-center text-xs text-gray-400">
-          None
-        </div>
-      );
+  const [selected, setSelected] = useState<'none' | 'low' | 'medium' | 'high'>('none');
+
+  const options = useMemo(
+    () => [
+      { id: 'none', label: 'None' },
+      { id: 'low', label: 'Low blur' },
+      { id: 'medium', label: 'Medium blur' },
+      { id: 'high', label: 'High blur' },
+    ] as const,
+    []
+  );
+
+  const apply = async (id: 'none' | 'low' | 'medium' | 'high') => {
+    if (!isSupported || !isReady) return;
+    try {
+      if (id === 'none') {
+        await disableBackgroundFilter();
+      } else {
+        await applyBackgroundBlurFilter(id);
+      }
+      setSelected(id);
+    } catch (e) {
+      console.error(e);
     }
-
-    if (option.type === 'blur') {
-      return (
-        <div className="w-full h-full relative overflow-hidden">
-          <div
-            className="absolute inset-0 bg-gradient-to-br from-gray-600 to-gray-800"
-            style={{ filter: `blur(${option.blurAmount! / 4}px)` }}
-          />
-          <div className="absolute inset-0 flex items-center justify-center text-xs text-white font-medium">
-            Blur
-          </div>
-        </div>
-      );
-    }
-
-    if (option.type === 'image' && option.imageUrl) {
-      return (
-        <div
-          className="w-full h-full"
-          style={{
-            background: option.imageUrl,
-            backgroundSize: 'cover',
-            backgroundPosition: 'center',
-          }}
-        />
-      );
-    }
-
-    return null;
   };
 
   return (
@@ -78,33 +66,35 @@ const BackgroundSelector = ({
         <h3 className="text-sm font-medium text-white px-1 py-2 mb-2">
           Visual effects
         </h3>
-        <div className="grid grid-cols-3 gap-3">
-          {BACKGROUND_OPTIONS.map((option) => {
-            const isSelected = option.id === selectedId;
-            return (
-              <button
-                key={option.id}
-                onClick={() => handleBackgroundClick(option)}
-                className={`relative flex flex-col items-center gap-2 p-2 rounded-lg hover:bg-[rgba(255,255,255,0.1)] transition-colors cursor-pointer ${
-                  isSelected ? 'ring-2 ring-blue-500' : ''
-                }`}
-                type="button"
-              >
-                <div className="w-full aspect-video rounded-md overflow-hidden bg-gray-700 relative">
-                  {renderBackgroundPreview(option)}
-                  {isSelected && (
-                    <div className="absolute top-1 right-1 w-5 h-5 bg-blue-500 rounded-full flex items-center justify-center">
+        {!isSupported && (
+          <div className="text-sm text-white/70 px-1 py-2">Background blur is not supported on this device.</div>
+        )}
+        {isSupported && (
+          <div className="grid grid-cols-2 gap-3">
+            {options.map((opt) => {
+              const isActive = selected === opt.id;
+              return (
+                <button
+                  key={opt.id}
+                  onClick={() => apply(opt.id)}
+                  disabled={!isReady}
+                  className={`relative flex items-center justify-between p-3 rounded-lg border border-white/10 text-white text-sm hover:bg-white/10 transition-colors ${
+                    isActive ? 'ring-2 ring-blue-500' : ''
+                  }`}
+                  type="button"
+                  title={opt.label}
+                >
+                  <span>{opt.label}</span>
+                  {isActive && (
+                    <span className="w-5 h-5 bg-blue-500 rounded-full flex items-center justify-center">
                       <Check className="w-3 h-3 text-white" />
-                    </div>
+                    </span>
                   )}
-                </div>
-                <span className="text-xs text-white text-center">
-                  {option.name}
-                </span>
-              </button>
-            );
-          })}
-        </div>
+                </button>
+              );
+            })}
+          </div>
+        )}
       </div>
     </Popup>
   );

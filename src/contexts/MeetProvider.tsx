@@ -7,6 +7,7 @@ import {
   StreamVideo,
   StreamVideoClient,
   User,
+  BackgroundFiltersProvider,
 } from '@stream-io/video-react-sdk';
 import { User as ChatUser, StreamChat } from 'stream-chat';
 import { Chat } from 'stream-chat-react';
@@ -96,7 +97,15 @@ const MeetProvider = ({ meetingId, children }: MeetProviderProps) => {
   return (
     <Chat client={chatClient!}>
       <StreamVideo client={videoClient!}>
-        <StreamCall call={call}>{children}</StreamCall>
+        <StreamCall call={call}>
+          <BackgroundFiltersProvider
+            onError={(error) => {
+              console.error('Background filter error', error);
+            }}
+          >
+            {children}
+          </BackgroundFiltersProvider>
+        </StreamCall>
       </StreamVideo>
     </Chat>
   );
