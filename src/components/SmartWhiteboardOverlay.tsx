@@ -155,6 +155,11 @@ export default function SmartWhiteboardOverlay({
       pan.current = undefined;
     }
   }, [open, flushDraft]);
+  useEffect(() => {
+    if (!open) return;
+    const timer = setInterval(() => flushDraft(false), 80);
+    return () => clearInterval(timer);
+  }, [open, flushDraft]);
   const point = (event: PointerEvent<HTMLCanvasElement>) => {
     const rect = event.currentTarget.getBoundingClientRect();
     return { x: event.clientX - rect.left, y: event.clientY - rect.top };
@@ -193,6 +198,7 @@ export default function SmartWhiteboardOverlay({
     segment.current = 0;
     lastFlush.current = performance.now();
     setDraft({ ...active.current });
+    flushDraft(false);
   };
   const move = (event: PointerEvent<HTMLCanvasElement>) => {
     const position = point(event);
@@ -218,7 +224,7 @@ export default function SmartWhiteboardOverlay({
     });
     setDraft({ ...active.current, points: [...active.current.points] });
     if (
-      performance.now() - lastFlush.current > 200 ||
+      performance.now() - lastFlush.current > 80 ||
       active.current.points.length - sent.current >= 256
     ) {
       lastFlush.current = performance.now();
