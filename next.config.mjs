@@ -1,14 +1,15 @@
-import { hostname } from 'os';
+import { fileURLToPath } from 'node:url';
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  outputFileTracingRoot: fileURLToPath(new URL('.', import.meta.url)),
   images: {
     remotePatterns: [
       {
         hostname: 'cdn.tailgrids.com',
       },
       {
-        hostname: 'gstatic.com',
+        hostname: 'www.gstatic.com',
       },
       {
         hostname: 'img.clerk.com',

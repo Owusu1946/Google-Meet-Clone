@@ -1,0 +1,37 @@
+export const CALL_TYPE = 'meet';
+export const CHAT_TYPE = 'meet-chat';
+export const BOARD_TYPE = 'meet-board';
+export const REQUEST_TYPE = 'meet-requests';
+export const MEETING_ID_REGEX = /^[a-z]{3}-[a-z]{4}-[a-z]{3}$/;
+
+export function parseMeetingCode(input: string): string | null {
+  const trimmed = input.trim();
+  const code = trimmed.toLowerCase();
+  if (MEETING_ID_REGEX.test(code)) return code;
+  try {
+    const url = new URL(trimmed.includes('://') ? trimmed : `https://${trimmed}`);
+    if (!['http:', 'https:'].includes(url.protocol)) return null;
+    const parts = url.pathname.split('/').filter(Boolean);
+    const candidate = parts[0]?.toLowerCase();
+    return candidate && MEETING_ID_REGEX.test(candidate) && (parts.length === 1 || (parts.length === 2 && parts[1] === 'meeting')) ? candidate : null;
+  } catch { return null; }
+}
+
+export type MeetingIdentity = { id: string; name: string; image?: string; guest: boolean };
+export type AccessStatus = 'ready' | 'request' | 'waiting' | 'denied' | 'locked' | 'ended';
+export type MeetingAccess = {
+  status: AccessStatus; meetingId: string; hostName: string; hostId: string;
+  isHost: boolean; locked: boolean; access: 'restricted' | 'open';
+  identity: MeetingIdentity; participantCount: number; token?: string;
+};
+export type JoinRequest = { id: string; name: string; requestedAt: string };
+
+export async function api<T>(url: string, init?: RequestInit): Promise<T> {
+  const response = await fetch(url, { ...init, cache: 'no-store', headers: { 'Content-Type': 'application/json', ...init?.headers } });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(data.error || 'The request failed. Please try again.');
+  return data as T;
+}
+export function errorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : 'Something went wrong. Please try again.';
+}
