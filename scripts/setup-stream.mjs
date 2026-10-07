@@ -74,18 +74,21 @@ for (const [name, write] of [
         ...(write
           ? [
               'create-message',
+              'create-reply',
               'update-message-owner',
               'delete-message-owner',
               'send-custom-event',
               'add-links',
             ]
-          : []),
+          : name === 'meet-board'
+            ? ['send-custom-event']
+            : []),
       ],
     },
     custom_events: true,
     typing_events: write,
     read_events: write,
-    replies: false,
+    replies: write,
     reactions: false,
     uploads: false,
     commands: [],

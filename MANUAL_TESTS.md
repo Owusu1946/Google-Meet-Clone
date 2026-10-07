@@ -45,3 +45,11 @@ Use a signed-in host plus a second signed-in account and a named guest in separa
 27. Refresh/directly visit the exit page, use Rejoin/Home, and verify host recordings still load. Nothing redirects on a countdown.
 
 Record browser/device, scenario number, expected/actual result, and console/service error when reporting failures. Only mark end-to-end complete after media, service, and visual checks pass.
+
+## Real-time chat and board regression
+
+28. Type in main chat and in a thread: the other client sees your name only in that conversation. Stop, blur, send, close the panel, or disconnect: the indicator disappears. Empty drafts must not announce typing.
+29. Reply to a root message; check the reply count, open the thread on both devices, paginate earlier replies, and return to all messages. Replies stay inside the thread. Fail a send, then retry: preserve the draft and display exactly one message.
+30. Close Chat on one client and send both root messages and replies from another. The toolbar count includes both, ignores your own messages, and resets when you open Chat. Reload with Chat closed: server unread state is restored. Scroll up in a long conversation: incoming messages do not jump you away from history.
+31. Draw a dot, hold the pointer down, then draw a long stroke. Another client should see the first point immediately through the live path and progressive segments approximately every 80ms plus network delivery time. Record actual latency on separate devices/networks; this cadence is not a guaranteed end-to-end latency.
+32. Throttle the network and draw continuously, reload a third client, and disconnect/reconnect the sender. Saved segments must converge exactly once; unsaved remote previews expire after 30 seconds, while the sender retains pending edits for retry. Host clear, undo/redo, and disabled collaboration must still apply. Inspect sustained drawing CPU/network usage on a phone before a production rollout.

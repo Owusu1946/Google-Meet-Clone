@@ -128,7 +128,7 @@ export default function MeetingToolbar() {
           />
           {unread > 0 && (
             <span className="absolute -top-1 -right-1 bg-primary text-white text-[10px] rounded-full px-1.5">
-              {unread > 9 ? '9+' : unread}
+              {unread > 99 ? '99+' : unread}
             </span>
           )}
         </div>
