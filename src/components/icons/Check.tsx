@@ -6,7 +6,10 @@ interface CheckProps {
 
 const Check = ({ className }: CheckProps) => {
   return (
-    <i className={`material-symbols-outlined ${className || ''}`} aria-hidden="true">
+    <i
+      className={`material-symbols-outlined ${className || ''}`}
+      aria-hidden="true"
+    >
       check
     </i>
   );

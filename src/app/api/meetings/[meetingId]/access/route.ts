@@ -1,6 +1,19 @@
 import { identity } from '@/lib/server/identity';
-import { assertSameOrigin, failure, HttpError, json, readBody } from '@/lib/server/http';
-import { addMember, chatServer, meetingCall, requestChannel, stream, syncIdentity } from '@/lib/server/stream';
+import {
+  assertSameOrigin,
+  failure,
+  HttpError,
+  json,
+  readBody,
+} from '@/lib/server/http';
+import {
+  addMember,
+  chatServer,
+  meetingCall,
+  requestChannel,
+  stream,
+  syncIdentity,
+} from '@/lib/server/stream';
 import { AccessStatus } from '@/lib/meeting';
 
 type Context = { params: Promise<{ meetingId: string }> };
@@ -12,7 +25,10 @@ async function access(meetingId: string, ask: boolean, name?: string) {
   const locked = data.custom.locked === true;
   const policy = data.custom.access === 'open' ? 'open' : 'restricted';
   let status: AccessStatus = 'request';
-  const member = await call.queryMembers({ filter_conditions: { user_id: user.id }, limit: 1 });
+  const member = await call.queryMembers({
+    filter_conditions: { user_id: user.id },
+    limit: 1,
+  });
   if (data.ended_at) status = 'ended';
   else if (data.blocked_user_ids.includes(user.id)) status = 'denied';
   else if (isHost || member.members.length) status = 'ready';
@@ -20,11 +36,24 @@ async function access(meetingId: string, ask: boolean, name?: string) {
   else {
     const channel = requestChannel(meetingId, user.id);
     if (ask) {
-      if (!user.name) throw new HttpError(400, 'Enter your name before asking to join.');
+      if (!user.name)
+        throw new HttpError(400, 'Enter your name before asking to join.');
       await syncIdentity(user);
-      if (policy === 'open') { await addMember(meetingId, user.id); status = 'ready'; }
-      else {
-        const result = await chatServer().channel('meet-requests', channel.id!, { created_by_id: data.created_by.id, members: [data.created_by.id], meeting_id: meetingId, applicant_id: user.id, applicant_name: user.name, status: 'waiting', requested_at: new Date().toISOString() }).create();
+      if (policy === 'open') {
+        await addMember(meetingId, user.id);
+        status = 'ready';
+      } else {
+        const result = await chatServer()
+          .channel('meet-requests', channel.id!, {
+            created_by_id: data.created_by.id,
+            members: [data.created_by.id],
+            meeting_id: meetingId,
+            applicant_id: user.id,
+            applicant_name: user.name,
+            status: 'waiting',
+            requested_at: new Date().toISOString(),
+          })
+          .create();
         status = result.channel?.status === 'denied' ? 'denied' : 'waiting';
       }
     } else {
@@ -34,14 +63,32 @@ async function access(meetingId: string, ask: boolean, name?: string) {
   }
   if (status === 'ready') await syncIdentity(user);
   return {
-    status, meetingId, hostName: data.created_by.name || 'Host', hostId: data.created_by.id, isHost, locked, access: policy, identity: user,
+    status,
+    meetingId,
+    hostName: data.created_by.name || 'Host',
+    hostId: data.created_by.id,
+    isHost,
+    locked,
+    access: policy,
+    identity: user,
     participantCount: data.session?.participants.length || 0,
-    ...(status === 'ready' ? { token: stream().generateUserToken({ user_id: user.id, validity_in_seconds: 900 }) } : {}),
+    ...(status === 'ready'
+      ? {
+          token: stream().generateUserToken({
+            user_id: user.id,
+            validity_in_seconds: 900,
+          }),
+        }
+      : {}),
   };
 }
 async function streamRequestState(id: string) {
   const { chatServer } = await import('@/lib/server/stream');
-  const response = await chatServer().queryChannels({ type: 'meet-requests', id }, [], { limit: 1, state: false });
+  const response = await chatServer().queryChannels(
+    { type: 'meet-requests', id },
+    [],
+    { limit: 1, state: false },
+  );
   return response[0]?.data?.status;
 }
 // POST also establishes an HttpOnly guest session; read-only polling uses the same identity.
@@ -50,6 +97,14 @@ export async function POST(request: Request, context: Context) {
     assertSameOrigin(request);
     const { meetingId } = await context.params;
     const body = await readBody(request);
-    return json(await access(meetingId, body.ask === true, typeof body.name === 'string' ? body.name : undefined));
-  } catch (error) { return failure(error); }
+    return json(
+      await access(
+        meetingId,
+        body.ask === true,
+        typeof body.name === 'string' ? body.name : undefined,
+      ),
+    );
+  } catch (error) {
+    return failure(error);
+  }
 }

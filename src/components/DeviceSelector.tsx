@@ -1,6 +1,11 @@
-import { ReactNode } from 'react';
+import { ReactNode, useState } from 'react';
 import { useCallStateHooks } from '@stream-io/video-react-sdk';
 
+import { errorMessage } from '@/lib/meeting';
+import {
+  readDevicePreferences,
+  saveDevicePreferences,
+} from '@/hooks/usePreviewMedia';
 import Dropdown from './Dropdown';
 import Mic from './icons/Mic';
 import Videocam from './icons/Videocam';
@@ -9,7 +14,8 @@ import VolumeUp from './icons/VolumeUp';
 type DeviceSelectorProps = {
   devices: MediaDeviceInfo[] | undefined;
   selectedDeviceId?: string;
-  onSelect: (deviceId: string) => void;
+  onSelect: (deviceId: string) => Promise<void> | void;
+  preference?: 'audioId' | 'videoId' | 'speakerId';
   icon: ReactNode;
   disabled?: boolean;
   className?: string;
@@ -24,6 +30,7 @@ type SelectorProps = {
 
 export const DeviceSelector = ({
   devices,
+  preference,
   selectedDeviceId,
   onSelect,
   icon,
@@ -31,26 +38,52 @@ export const DeviceSelector = ({
   className = '',
   dark = false,
 }: DeviceSelectorProps) => {
+  const [error, setError] = useState('');
+  const [busy, setBusy] = useState(false);
+  const select = async (value: string) => {
+    setBusy(true);
+    setError('');
+    try {
+      await onSelect(value);
+      if (preference)
+        saveDevicePreferences({
+          ...readDevicePreferences(),
+          [preference]: value,
+        });
+    } catch (failure) {
+      setError(errorMessage(failure));
+    } finally {
+      setBusy(false);
+    }
+  };
   const label =
-    devices?.find((device) => device.deviceId === selectedDeviceId)?.label! ||
-    'Default - ...';
+    devices?.find((device) => device.deviceId === selectedDeviceId)?.label ||
+    'Default device';
 
   return (
-    <Dropdown
-      label={disabled ? 'Permission needed' : label}
-      value={selectedDeviceId}
-      icon={icon}
-      onChange={(value) => onSelect(value)}
-      options={
-        devices?.map((device) => ({
-          label: device.label,
-          value: device.deviceId,
-        }))!
-      }
-      disabled={disabled}
-      className={className}
-      dark={dark}
-    />
+    <div>
+      <Dropdown
+        label={disabled ? 'Permission needed' : label}
+        value={selectedDeviceId}
+        icon={icon}
+        onChange={(value) => void select(value)}
+        options={
+          devices?.map((device) => ({
+            label:
+              device.label || `${device.kind} ${device.deviceId.slice(0, 6)}`,
+            value: device.deviceId,
+          })) || []
+        }
+        disabled={disabled || busy}
+        className={className}
+        dark={dark}
+      />
+      {error && (
+        <p role="alert" className="text-xs text-meet-red mt-2">
+          {error}
+        </p>
+      )}
+    </div>
   );
 };
 
@@ -66,6 +99,7 @@ export const AudioInputDeviceSelector = ({
     <DeviceSelector
       devices={devices}
       selectedDeviceId={selectedDevice}
+      preference="audioId"
       onSelect={(deviceId) => microphone.select(deviceId)}
       icon={<Mic width={20} height={20} color="var(--meet-black)" />}
       disabled={disabled}
@@ -87,6 +121,7 @@ export const VideoInputDeviceSelector = ({
     <DeviceSelector
       devices={devices}
       selectedDeviceId={selectedDevice}
+      preference="videoId"
       onSelect={(deviceId) => camera.select(deviceId)}
       icon={<Videocam width={18} height={18} color="var(--meet-black)" />}
       disabled={disabled}
@@ -114,9 +149,10 @@ export const AudioOutputDeviceSelector = ({
         selectedDevice
           ? selectedDevice
           : devices
-          ? devices[0]?.deviceId
-          : 'Default - ...'
+            ? devices[0]?.deviceId
+            : 'Default - ...'
       }
+      preference="speakerId"
       onSelect={(deviceId) => speaker.select(deviceId)}
       icon={<VolumeUp width={20} height={20} color="var(--meet-black)" />}
       disabled={disabled}

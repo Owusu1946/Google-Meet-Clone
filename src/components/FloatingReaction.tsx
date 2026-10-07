@@ -9,7 +9,12 @@ interface FloatingReactionProps {
   onComplete: (id: string) => void;
 }
 
-const FloatingReaction = ({ emoji, id, senderName, onComplete }: FloatingReactionProps) => {
+const FloatingReaction = ({
+  emoji,
+  id,
+  senderName,
+  onComplete,
+}: FloatingReactionProps) => {
   const reactionRef = useRef<HTMLDivElement>(null);
   const badgeRef = useRef<HTMLDivElement>(null);
 
@@ -39,31 +44,34 @@ const FloatingReaction = ({ emoji, id, senderName, onComplete }: FloatingReactio
         scale: 1,
         duration: 0.3,
         ease: 'back.out(1.7)',
-      }
-    )
-      .to(reactionRef.current, {
-        left: `${endX}%`,
-        bottom: '90%',
-        opacity: 0,
-        scale: 0.8,
-        duration: 2.5,
-        ease: 'power1.inOut',
-      });
-    
+      },
+    ).to(reactionRef.current, {
+      left: `${endX}%`,
+      bottom: '90%',
+      opacity: 0,
+      scale: 0.8,
+      duration: 2.5,
+      ease: 'power1.inOut',
+    });
+
     // Animate badge separately with fade out
     if (badgeRef.current && senderName) {
-      tl.to(badgeRef.current, {
-        opacity: 0,
-        duration: 0.4,
-      }, '-=2.1');
+      tl.to(
+        badgeRef.current,
+        {
+          opacity: 0,
+          duration: 0.4,
+        },
+        '-=2.1',
+      );
     }
-    
+
     tl.progress(0.001); // Start slightly delayed for stagger effect
 
     return () => {
       tl.kill();
     };
-  }, [id, onComplete]);
+  }, [id, onComplete, senderName]);
 
   return (
     <div

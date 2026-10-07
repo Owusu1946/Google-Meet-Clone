@@ -11,6 +11,7 @@ export interface IconButtonProps {
   alert?: boolean;
   title?: string;
   className?: string;
+  disabled?: boolean;
 }
 
 const IconButton = ({
@@ -21,6 +22,7 @@ const IconButton = ({
   variant = 'primary',
   title,
   className,
+  disabled = false,
 }: IconButtonProps) => {
   const alertIcon = (
     <div className="absolute -top-[5px] right-0 w-6 h-6 bg-meet-orange rounded-full flex items-center justify-center">
@@ -33,9 +35,12 @@ const IconButton = ({
       <button
         onClick={onClick}
         title={title}
+        aria-label={title}
+        aria-pressed={active}
+        disabled={disabled}
         className={clsx(
           'relative h-9 w-9 rounded-full inline-flex items-center justify-center text-center text-base font-medium hover:bg-[#f6f6f6] disabled:bg-transparent disabled:text-[#3c404361] [&_svg]:fill-meet-gray',
-          className
+          className,
         )}
       >
         {icon}
@@ -47,6 +52,9 @@ const IconButton = ({
       <button
         onClick={onClick}
         title={title}
+        aria-label={title}
+        aria-pressed={active}
+        disabled={disabled}
         style={{
           WebkitMaskImage: 'none',
         }}
@@ -55,7 +63,7 @@ const IconButton = ({
           active
             ? 'bg-meet-red border-meet-red hover:bg-hover-red hover:border-hover-red transition-none'
             : 'hover:bg-[rgba(255,255,255,.4)] border-white',
-          className
+          className,
         )}
       >
         {icon}

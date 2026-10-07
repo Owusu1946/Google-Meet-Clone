@@ -42,7 +42,7 @@ const VideoPlaceholder = forwardRef<HTMLDivElement, VideoPlaceholderProps>(
           }}
           className={clsx(
             participant.image && 'hidden',
-            'relative avatar w-3/10 max-w-40 aspect-square uppercase rounded-full text-white font-sans-serif font-medium flex items-center justify-center'
+            'relative avatar w-3/10 max-w-40 aspect-square uppercase rounded-full text-white font-sans-serif font-medium flex items-center justify-center',
           )}
         >
           <span className="text-[clamp(30px,_calc(100vw_*_0.05),_65px)] select-none">
@@ -51,7 +51,7 @@ const VideoPlaceholder = forwardRef<HTMLDivElement, VideoPlaceholderProps>(
         </div>
       </div>
     );
-  }
+  },
 );
 
 export default VideoPlaceholder;

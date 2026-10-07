@@ -9,35 +9,35 @@
     "lint": "eslint src --max-warnings 0",
     "typecheck": "tsc --noEmit",
     "test": "tsx --test tests/*.test.ts",
-    "setup:stream": "node --env-file=.env scripts/setup-stream.mjs"
+    "setup:stream": "node --env-file=.env scripts/setup-stream.mjs",
+    "format": "prettier --write src scripts tests *.json next.config.mjs",
+    "format:check": "prettier --check src scripts tests *.json next.config.mjs",
+    "verify:services": "node --env-file=.env --import tsx scripts/verify-services.mts"
   },
   "dependencies": {
     "@clerk/nextjs": "6.39.7",
-    "@gsap/react": "2.1.2",
     "@stream-io/node-sdk": "0.4.26",
+    "@stream-io/video-client": "1.61.1",
     "@stream-io/video-react-sdk": "1.43.3",
     "clsx": "2.1.1",
     "gsap": "3.15.0",
-    "nanoid": "5.1.16",
     "next": "15.5.27",
     "react": "19.3.0",
     "react-dom": "19.3.0",
     "stream-chat": "8.61.0",
-    "svix": "1.99.1",
-    "@stream-io/video-client": "1.61.1"
+    "svix": "1.99.1"
   },
   "devDependencies": {
     "@types/node": "20.19.43",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
-    "concurrently": "8.2.2",
-    "detect-port": "1.6.1",
     "eslint": "8.57.1",
     "eslint-config-next": "15.5.27",
     "postcss": "8.5.29",
+    "prettier": "^3.9.9",
     "tailwindcss": "3.4.19",
-    "typescript": "5.9.3",
-    "tsx": "^4.20.0"
+    "tsx": "^4.20.0",
+    "typescript": "5.9.3"
   },
   "packageManager": "pnpm@10.33.0",
   "engines": {

@@ -29,7 +29,8 @@ const Avatar = ({ text = '', width, participant = {} }: AvatarProps) => {
     }
     return (
       (participant as StreamVideoParticipant).name ||
-      (participant as StreamVideoParticipant).userId
+      (participant as StreamVideoParticipant).userId ||
+      'Participant'
     );
   }, [participant]);
 
@@ -50,6 +51,7 @@ const Avatar = ({ text = '', width, participant = {} }: AvatarProps) => {
     return (
       <Image
         className="rounded-full overflow-hidden"
+        unoptimized
         src={image}
         alt={name}
         width={width || IMAGE_SIZE}
@@ -66,7 +68,7 @@ const Avatar = ({ text = '', width, participant = {} }: AvatarProps) => {
       className={clsx(
         !width && 'max-w-40',
         'aspect-square rounded-full uppercase text-white font-sans-serif font-medium flex items-center justify-center',
-        avatarClassName
+        avatarClassName,
       )}
     >
       <div className={clsx(text ? 'text-xs' : 'text-base', 'select-none')}>

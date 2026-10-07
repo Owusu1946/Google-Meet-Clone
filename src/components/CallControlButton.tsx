@@ -10,6 +10,7 @@ const CallControlButton = ({
   icon,
   onClick,
   title,
+  disabled,
 }: CallControlButtonProps) => {
   return (
     <IconButton
@@ -18,6 +19,7 @@ const CallControlButton = ({
       alert={alert}
       icon={icon}
       title={title}
+      disabled={disabled}
       className={clsx('call-control-button', className)}
       onClick={onClick}
     />

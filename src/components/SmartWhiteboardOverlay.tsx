@@ -1,557 +1,427 @@
 'use client';
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type PointerEvent,
+} from 'react';
+import { useCallStateHooks } from '@stream-io/video-react-sdk';
+import { useMeeting } from '@/contexts/MeetProvider';
+import { useRoom } from '@/contexts/MeetingRoomContext';
+import {
+  boardStrokes,
+  viewToWorld,
+  zoomAt,
+  type BoardStroke,
+  type Point,
+  type StrokeMode,
+} from '@/lib/whiteboard';
+import Dialog from './Dialog';
+import Close from './icons/Close';
 
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import clsx from 'clsx';
-import { type Channel as ChannelType } from 'stream-chat';
-import { DefaultStreamChatGenerics } from 'stream-chat-react';
-import Brush from '@/components/icons/Brush';
-import Close from '@/components/icons/Close';
-import Highlighter from '@/components/icons/Highlighter';
-import Eraser from '@/components/icons/Eraser';
-import Undo from '@/components/icons/Undo';
-import Redo from '@/components/icons/Redo';
-import ClearIcon from '@/components/icons/Clear';
-import LinkIcon from '@/components/icons/Link';
-
-// Types for network events over Stream Chat. Namespaced to avoid collisions.
-// All coordinates are in world-space (pre-transform) so pan/zoom is purely client-side.
-
-type StrokeMode = 'pen' | 'highlighter' | 'eraser';
-
-type Point = { x: number; y: number };
-
-type DrawEvent = {
-  type: 'wb_draw';
-  strokeId: string;
-  userId?: string | null;
-  mode: StrokeMode;
-  color: string;
-  width: number;
-  points: Point[]; // appended points (incremental)
-};
-
-type ClearEvent = { type: 'wb_clear'; userId?: string | null };
-
-type CursorEvent = { type: 'wb_cursor'; userId?: string | null; x: number; y: number };
-
-type SnapshotRequestEvent = { type: 'wb_snapshot_request'; userId?: string | null };
-
-type SnapshotResponseEvent = { type: 'wb_snapshot_response'; dataUrl: string; userId?: string | null };
-
-type PresentStart = { type: 'wb_present_start'; video_user_id?: string | null };
-
-type PresentStop = { type: 'wb_present_stop'; video_user_id?: string | null };
-
-export type WBEvent =
-  | DrawEvent
-  | ClearEvent
-  | CursorEvent
-  | SnapshotRequestEvent
-  | SnapshotResponseEvent
-  | PresentStart
-  | PresentStop;
-
-// In-memory stroke model
-interface StrokeModel {
-  id: string;
-  userId?: string | null;
-  mode: StrokeMode;
-  color: string;
-  width: number;
-  points: Point[]; // world coords
+type Tool = StrokeMode | 'pan';
+function paint(
+  ctx: CanvasRenderingContext2D,
+  strokes: BoardStroke[],
+  scale: number,
+  offset: Point,
+) {
+  ctx.save();
+  ctx.translate(offset.x, offset.y);
+  ctx.scale(scale, scale);
+  for (const stroke of strokes) {
+    if (!stroke.visible || !stroke.points.length) continue;
+    ctx.save();
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    ctx.lineWidth = stroke.width;
+    ctx.globalAlpha = stroke.mode === 'highlighter' ? 0.35 : 1;
+    ctx.globalCompositeOperation =
+      stroke.mode === 'eraser' ? 'destination-out' : 'source-over';
+    ctx.strokeStyle = stroke.color;
+    ctx.fillStyle = stroke.color;
+    const [first, ...rest] = stroke.points;
+    if (!rest.length) {
+      ctx.beginPath();
+      ctx.arc(first.x, first.y, stroke.width / 2, 0, Math.PI * 2);
+      ctx.fill();
+    } else {
+      ctx.beginPath();
+      ctx.moveTo(first.x, first.y);
+      rest.forEach((point) => ctx.lineTo(point.x, point.y));
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
+  ctx.restore();
 }
 
-interface SmartWhiteboardOverlayProps {
-  open: boolean;
-  onClose: () => void;
-  chatChannel?: ChannelType<DefaultStreamChatGenerics>;
-  meId?: string | null;
-  isPresenter?: boolean; // presenter can force-push snapshots, optional
-  allowCollaboration?: boolean; // if true, everyone can draw; otherwise only presenter
-}
-
-const SmartWhiteboardOverlay = ({
+export default function SmartWhiteboardOverlay({
   open,
   onClose,
-  chatChannel,
-  meId = null,
-  isPresenter = false,
-  allowCollaboration = true,
-}: SmartWhiteboardOverlayProps) => {
-  const containerRef = useRef<HTMLDivElement | null>(null);
-  const canvasRef = useRef<HTMLCanvasElement | null>(null);
-  const overlayRef = useRef<HTMLDivElement | null>(null);
-
-  // View transform
-  const [scale, setScale] = useState(1);
-  const [offset, setOffset] = useState({ x: 0, y: 0 });
-  const panning = useRef(false);
-  const panStart = useRef({ x: 0, y: 0 });
-  const panOffsetStart = useRef({ x: 0, y: 0 });
-
-  // Tools
-  const [tool, setTool] = useState<StrokeMode>('pen');
-  const [color, setColor] = useState('#22c55e'); // emerald-500
+}: {
+  open: boolean;
+  onClose: () => void;
+}) {
+  const { access } = useMeeting();
+  const { useCallCustomData } = useCallStateHooks();
+  const custom = useCallCustomData();
+  const { operations, send, loading, error, pending, retry, available } =
+    useRoom().board;
+  const canDraw =
+    available && !loading && (access.isHost || custom.collaboration !== false);
+  const canvas = useRef<HTMLCanvasElement>(null);
+  const [tool, setTool] = useState<Tool>('pen');
+  const [color, setColor] = useState('#202124');
   const [width, setWidth] = useState(3);
-
-  // Strokes & history
-  const strokes = useRef<Map<string, StrokeModel>>(new Map());
-  const drawOrder = useRef<string[]>([]);
-  const undone = useRef<string[]>([]);
-
-  // Local drawing state
-  const activeStrokeId = useRef<string | null>(null);
-  const isDrawing = useRef(false);
-  // Outgoing batching per animation frame
-  const sendBuffer = useRef<{ strokeId: string; mode: StrokeMode; color: string; width: number; points: Point[] } | null>(null);
-  const rafSend = useRef<number | null>(null);
-  const flushSend = useCallback(() => {
-    rafSend.current = null;
-    if (!chatChannel) return;
-    const buf = sendBuffer.current;
-    if (!buf || buf.points.length === 0) return;
-    const payload: DrawEvent = {
-      type: 'wb_draw',
-      strokeId: buf.strokeId,
-      userId: meId,
-      mode: buf.mode,
-      color: buf.color,
-      width: buf.width,
-      points: buf.points.splice(0, buf.points.length),
+  const [transform, setTransform] = useState({
+    scale: 1,
+    offset: { x: 0, y: 0 },
+  });
+  const [size, setSize] = useState({ width: 1, height: 1 });
+  const [draft, setDraft] = useState<BoardStroke>();
+  const active = useRef<BoardStroke | undefined>(undefined);
+  const segment = useRef(0);
+  const sent = useRef(0);
+  const lastFlush = useRef(0);
+  const pan = useRef<{ point: Point; offset: Point } | undefined>(undefined);
+  const [clearPrompt, setClearPrompt] = useState(false);
+  const strokes = useMemo(() => boardStrokes(operations), [operations]);
+  const lastOwn = [...strokes]
+    .reverse()
+    .find((stroke) => stroke.actor === access.identity.id && stroke.visible);
+  const lastHidden = [...strokes]
+    .reverse()
+    .find((stroke) => stroke.actor === access.identity.id && !stroke.visible);
+  const visibleStrokes = useMemo(() => {
+    if (!draft) return strokes;
+    return [...strokes.filter((stroke) => stroke.id !== draft.id), draft];
+  }, [strokes, draft]);
+  useEffect(() => {
+    if (!open || !canvas.current) return;
+    const element = canvas.current;
+    const measure = () => {
+      const rect = element.getBoundingClientRect();
+      setSize({ width: rect.width, height: rect.height });
     };
-    chatChannel.sendEvent(payload as any).catch(() => void 0);
-  }, [chatChannel, meId]);
-
-  // Remote cursors
-  const cursors = useRef<Map<string, { x: number; y: number; ts: number }>>(new Map());
-  const [cursorTick, setCursorTick] = useState(0);
-  const lastCursorSentAt = useRef(0);
-
-  // Helpers
-  const devicePixelRatioSafe = typeof window !== 'undefined' ? window.devicePixelRatio || 1 : 1;
-
-  const canDraw = allowCollaboration || isPresenter;
-
-  const worldToView = useCallback(
-    (p: Point): Point => ({ x: p.x * scale + offset.x, y: p.y * scale + offset.y }),
-    [scale, offset]
-  );
-  const viewToWorld = useCallback(
-    (p: Point): Point => ({ x: (p.x - offset.x) / scale, y: (p.y - offset.y) / scale }),
-    [scale, offset]
-  );
-
-  const resizeCanvas = useCallback(() => {
-    const canvas = canvasRef.current;
-    const container = containerRef.current;
-    if (!canvas || !container) return;
-    const rect = container.getBoundingClientRect();
-    const w = Math.floor(rect.width * devicePixelRatioSafe);
-    const h = Math.floor(rect.height * devicePixelRatioSafe);
-    if (canvas.width !== w || canvas.height !== h) {
-      canvas.width = w;
-      canvas.height = h;
-      const ctx = canvas.getContext('2d');
-      if (ctx) ctx.setTransform(devicePixelRatioSafe, 0, 0, devicePixelRatioSafe, 0, 0);
-      redraw();
-    }
-  }, [devicePixelRatioSafe]);
-
-  // Prepare remote cursor render list
-  const cursorList = useMemo(() => {
-    const now = Date.now();
-    const items: Array<{ id: string; x: number; y: number }> = [];
-    cursors.current.forEach((v, k) => {
-      if (now - v.ts < 750) {
-        const p = worldToView({ x: v.x, y: v.y });
-        items.push({ id: k, x: p.x, y: p.y });
-      }
+    const observer = new ResizeObserver(measure);
+    observer.observe(element);
+    measure();
+    return () => observer.disconnect();
+  }, [open]);
+  useEffect(() => {
+    if (!open || !canvas.current) return;
+    const element = canvas.current;
+    const frame = requestAnimationFrame(() => {
+      const ratio = window.devicePixelRatio || 1;
+      element.width = Math.round(size.width * ratio);
+      element.height = Math.round(size.height * ratio);
+      const ctx = element.getContext('2d');
+      if (!ctx) return;
+      ctx.setTransform(ratio, 0, 0, ratio, 0, 0);
+      paint(ctx, visibleStrokes, transform.scale, transform.offset);
     });
-    return items;
-  }, [cursorTick, worldToView]);
-
-  const clearCanvas = useCallback(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-  }, []);
-
-  const drawStroke = useCallback(
-    (s: StrokeModel) => {
-      const canvas = canvasRef.current;
-      const ctx = canvas?.getContext('2d');
-      if (!canvas || !ctx || s.points.length < 1) return;
-
-      ctx.save();
-      ctx.lineCap = 'round';
-      ctx.lineJoin = 'round';
-
-      // tool modes
-      if (s.mode === 'highlighter') {
-        ctx.globalAlpha = 0.35;
-        ctx.globalCompositeOperation = 'source-over';
-      } else if (s.mode === 'eraser') {
-        ctx.globalCompositeOperation = 'destination-out';
-        ctx.globalAlpha = 1;
-      } else {
-        ctx.globalCompositeOperation = 'source-over';
-        ctx.globalAlpha = 1;
-      }
-
-      ctx.strokeStyle = s.color;
-      ctx.lineWidth = s.width * scale; // scale line width by zoom for visual consistency
-
-      ctx.beginPath();
-      const first = worldToView(s.points[0]);
-      ctx.moveTo(first.x, first.y);
-      for (let i = 1; i < s.points.length; i++) {
-        const p = worldToView(s.points[i]);
-        const prev = worldToView(s.points[i - 1]);
-        // simple smoothing via quadratic curve
-        const cx = (prev.x + p.x) / 2;
-        const cy = (prev.y + p.y) / 2;
-        ctx.quadraticCurveTo(prev.x, prev.y, cx, cy);
-      }
-      ctx.stroke();
-      ctx.restore();
-    },
-    [scale, worldToView]
-  );
-
-  const redraw = useCallback(() => {
-    clearCanvas();
-    const order = drawOrder.current;
-    const map = strokes.current;
-    for (let i = 0; i < order.length; i++) {
-      const s = map.get(order[i]);
-      if (s) drawStroke(s);
-    }
-  }, [clearCanvas, drawStroke]);
-
-  useEffect(() => {
-    if (!open) return;
-    resizeCanvas();
-    const onResize = () => resizeCanvas();
-    window.addEventListener('resize', onResize);
-    return () => window.removeEventListener('resize', onResize);
-  }, [open, resizeCanvas]);
-
-  // Wheel zoom/pan
-  useEffect(() => {
-    if (!open) return;
-    const el = overlayRef.current;
-    if (!el) return;
-    const onWheel = (e: WheelEvent) => {
-      if (e.ctrlKey) {
-        e.preventDefault();
-        const delta = -e.deltaY;
-        const factor = Math.exp(delta * 0.0015);
-        const rect = el.getBoundingClientRect();
-        const mouse: Point = { x: e.clientX - rect.left, y: e.clientY - rect.top };
-        const before = viewToWorld(mouse);
-        setScale((s) => Math.min(4, Math.max(0.25, s * factor)));
-        // Recenter so the zoom focuses around cursor
-        requestAnimationFrame(() => {
-          const after = viewToWorld(mouse);
-          setOffset((o) => ({ x: o.x + (after.x - before.x) * scale, y: o.y + (after.y - before.y) * scale }));
-          redraw();
+    return () => cancelAnimationFrame(frame);
+  }, [open, size, visibleStrokes, transform]);
+  const flushDraft = useCallback(
+    (finish: boolean) => {
+      const stroke = active.current;
+      if (!stroke) return;
+      while (sent.current < stroke.points.length) {
+        const points = stroke.points.slice(sent.current, sent.current + 256);
+        send({
+          kind: 'stroke',
+          strokeId: stroke.id,
+          segment: segment.current++,
+          points,
+          mode: stroke.mode,
+          color: stroke.color,
+          width: stroke.width,
         });
-        return;
+        sent.current += points.length;
       }
-    };
-    el.addEventListener('wheel', onWheel, { passive: false });
-    return () => el.removeEventListener('wheel', onWheel as any);
-  }, [open, viewToWorld, scale, redraw]);
-
-  // Pointer interactions
-  const pointerToWorld = useCallback(
-    (ev: PointerEvent): Point => {
-      const el = overlayRef.current;
-      const rect = el?.getBoundingClientRect();
-      const view: Point = { x: ev.clientX - (rect?.left || 0), y: ev.clientY - (rect?.top || 0) };
-      return viewToWorld(view);
-    },
-    [viewToWorld]
-  );
-
-  const beginStroke = useCallback(
-    (pt: Point) => {
-      const id = `${meId || 'anon'}:${Date.now()}:${Math.random().toString(36).slice(2, 7)}`;
-      const s: StrokeModel = { id, userId: meId, mode: tool, color, width, points: [pt] };
-      strokes.current.set(id, s);
-      drawOrder.current.push(id);
-      undone.current = [];
-      activeStrokeId.current = id;
-      isDrawing.current = true;
-      drawStroke(s);
-      // Initialize send buffer and schedule
-      sendBuffer.current = { strokeId: id, mode: tool, color, width, points: [pt] };
-      if (rafSend.current == null) rafSend.current = requestAnimationFrame(flushSend);
-    },
-    [color, drawStroke, meId, tool, width, flushSend]
-  );
-
-  const appendPoint = useCallback(
-    (pt: Point) => {
-      const id = activeStrokeId.current;
-      if (!id) return;
-      const s = strokes.current.get(id);
-      if (!s) return;
-      s.points.push(pt);
-      drawStroke(s);
-      // Batch for this frame
-      if (!sendBuffer.current || sendBuffer.current.strokeId !== id) {
-        sendBuffer.current = { strokeId: id, mode: s.mode, color: s.color, width: s.width, points: [] };
+      if (finish) {
+        active.current = undefined;
+        setDraft(undefined);
       }
-      sendBuffer.current.points.push(pt);
-      if (rafSend.current == null) rafSend.current = requestAnimationFrame(flushSend);
     },
-    [drawStroke, flushSend]
+    [send],
   );
-
-  const endStroke = useCallback(() => {
-    isDrawing.current = false;
-    // Ensure the final buffered points are sent immediately
-    if (rafSend.current != null) {
-      cancelAnimationFrame(rafSend.current);
-      rafSend.current = null;
-    }
-    if (sendBuffer.current && sendBuffer.current.points.length > 0) {
-      flushSend();
-    }
-    activeStrokeId.current = null;
-  }, [flushSend]);
-
   useEffect(() => {
-    if (!open) return;
-    const el = overlayRef.current;
-    if (!el) return;
-
-    const onPointerDown = (ev: PointerEvent) => {
-      if (!canDraw) return;
-      if (ev.button === 1 || (ev.button === 0 && ev.shiftKey)) {
-        // middle-click or Shift+drag pans
-        panning.current = true;
-        panStart.current = { x: ev.clientX, y: ev.clientY };
-        panOffsetStart.current = { ...offset };
-        return;
-      }
-      if (ev.button !== 0) return;
-      (ev.target as Element).setPointerCapture(ev.pointerId);
-      const pt = pointerToWorld(ev);
-      beginStroke(pt);
+    if (!open) {
+      flushDraft(true);
+      pan.current = undefined;
+    }
+  }, [open, flushDraft]);
+  const point = (event: PointerEvent<HTMLCanvasElement>) => {
+    const rect = event.currentTarget.getBoundingClientRect();
+    return { x: event.clientX - rect.left, y: event.clientY - rect.top };
+  };
+  const down = (event: PointerEvent<HTMLCanvasElement>) => {
+    if (
+      active.current ||
+      pan.current ||
+      (event.button !== 0 && event.button !== 1)
+    )
+      return;
+    const position = point(event);
+    event.currentTarget.setPointerCapture(event.pointerId);
+    if (tool === 'pan' || event.shiftKey || event.button === 1) {
+      pan.current = { point: position, offset: transform.offset };
+      return;
+    }
+    if (!canDraw) return;
+    active.current = {
+      id: `${access.identity.id}:${crypto.randomUUID()}`,
+      actor: access.identity.id,
+      mode: tool,
+      width: Math.min(
+        40,
+        tool === 'highlighter'
+          ? width * 3
+          : tool === 'eraser'
+            ? width * 4
+            : width,
+      ),
+      color,
+      points: [viewToWorld(position, transform.scale, transform.offset)],
+      visible: true,
     };
-
-    const onPointerMove = (ev: PointerEvent) => {
-      if (panning.current) {
-        const dx = ev.clientX - panStart.current.x;
-        const dy = ev.clientY - panStart.current.y;
-        setOffset({ x: panOffsetStart.current.x + dx, y: panOffsetStart.current.y + dy });
-        redraw();
-        return;
-      }
-      const now = performance.now();
-      // Stream cursor at ~20fps
-      if (chatChannel && now - lastCursorSentAt.current > 50) {
-        lastCursorSentAt.current = now;
-        const pt = pointerToWorld(ev);
-        const payload: CursorEvent = { type: 'wb_cursor', userId: meId || undefined, x: pt.x, y: pt.y };
-        chatChannel.sendEvent(payload as any).catch(() => void 0);
-      }
-      if (!isDrawing.current) return;
-      appendPoint(pointerToWorld(ev));
-    };
-
-    const onPointerUp = () => {
-      if (panning.current) {
-        panning.current = false;
-        return;
-      }
-      endStroke();
-    };
-
-    el.addEventListener('pointerdown', onPointerDown);
-    window.addEventListener('pointermove', onPointerMove);
-    window.addEventListener('pointerup', onPointerUp);
-
-    return () => {
-      el.removeEventListener('pointerdown', onPointerDown);
-      window.removeEventListener('pointermove', onPointerMove);
-      window.removeEventListener('pointerup', onPointerUp);
-    };
-  }, [open, canDraw, offset, redraw, appendPoint, beginStroke, endStroke, pointerToWorld]);
-
-  // Network receive
+    sent.current = 0;
+    segment.current = 0;
+    lastFlush.current = performance.now();
+    setDraft({ ...active.current });
+  };
+  const move = (event: PointerEvent<HTMLCanvasElement>) => {
+    const position = point(event);
+    if (pan.current) {
+      setTransform((current) => ({
+        ...current,
+        offset: {
+          x: pan.current!.offset.x + position.x - pan.current!.point.x,
+          y: pan.current!.offset.y + position.y - pan.current!.point.y,
+        },
+      }));
+      return;
+    }
+    if (!active.current) return;
+    const world = viewToWorld(position, transform.scale, transform.offset);
+    if (active.current.points.length >= 10000) {
+      flushDraft(true);
+      return;
+    }
+    active.current.points.push({
+      x: Math.round(world.x * 100) / 100,
+      y: Math.round(world.y * 100) / 100,
+    });
+    setDraft({ ...active.current, points: [...active.current.points] });
+    if (
+      performance.now() - lastFlush.current > 200 ||
+      active.current.points.length - sent.current >= 256
+    ) {
+      lastFlush.current = performance.now();
+      flushDraft(false);
+    }
+  };
+  const end = () => {
+    flushDraft(true);
+    pan.current = undefined;
+  };
   useEffect(() => {
-    if (!open || !chatChannel) return;
-    const handler = (e: any) => {
-      const evt = e as WBEvent;
-      if (evt.type === 'wb_draw') {
-        const d = evt as DrawEvent;
-        let s = strokes.current.get(d.strokeId);
-        if (!s) {
-          s = { id: d.strokeId, userId: d.userId, mode: d.mode, color: d.color, width: d.width, points: [] };
-          strokes.current.set(d.strokeId, s);
-          drawOrder.current.push(d.strokeId);
-        }
-        s.points.push(...d.points);
-        drawStroke(s);
-      } else if (evt.type === 'wb_clear') {
-        strokes.current.clear();
-        drawOrder.current = [];
-        undone.current = [];
-        redraw();
-      } else if (evt.type === 'wb_cursor') {
-        const c = evt as CursorEvent;
-        if (!c.userId) return;
-        cursors.current.set(c.userId, { x: c.x, y: c.y, ts: Date.now() });
-        setCursorTick((t) => t + 1);
-      } else if (evt.type === 'wb_snapshot_request') {
-        if (!canvasRef.current) return;
-        try {
-          const url = canvasRef.current.toDataURL('image/png');
-          const payload: SnapshotResponseEvent = { type: 'wb_snapshot_response', dataUrl: url, userId: meId };
-          chatChannel.sendEvent(payload as any);
-        } catch {}
-      } else if (evt.type === 'wb_snapshot_response') {
-        // no-op by default; parent could listen on chatChannel externally
-      }
+    const element = canvas.current;
+    if (!open || !element) return;
+    const wheel = (event: WheelEvent) => {
+      if (!event.ctrlKey && !event.metaKey) return;
+      event.preventDefault();
+      const rect = element.getBoundingClientRect();
+      const cursor = {
+        x: event.clientX - rect.left,
+        y: event.clientY - rect.top,
+      };
+      setTransform((current) => {
+        const scale = Math.max(
+          0.25,
+          Math.min(4, current.scale * Math.exp(-event.deltaY * 0.001)),
+        );
+        return {
+          scale,
+          offset: zoomAt(cursor, current.scale, scale, current.offset),
+        };
+      });
     };
-    chatChannel.on(handler);
-    return () => chatChannel.off(handler);
-  }, [open, chatChannel, drawStroke, meId, redraw]);
-
-  // Controls
-  const clearBoard = () => {
-    strokes.current.clear();
-    drawOrder.current = [];
-    undone.current = [];
-    redraw();
-    chatChannel?.sendEvent({ type: 'wb_clear', userId: meId } as any).catch(() => void 0);
+    element.addEventListener('wheel', wheel, { passive: false });
+    return () => element.removeEventListener('wheel', wheel);
+  }, [open]);
+  const exportBoard = () => {
+    const points = strokes
+      .filter((stroke) => stroke.visible)
+      .flatMap((stroke) => stroke.points);
+    const bounds = points.reduce(
+      (value, point) => ({
+        minX: Math.min(value.minX, point.x),
+        minY: Math.min(value.minY, point.y),
+        maxX: Math.max(value.maxX, point.x),
+        maxY: Math.max(value.maxY, point.y),
+      }),
+      { minX: 0, minY: 0, maxX: 900, maxY: 600 },
+    );
+    const { minX, minY, maxX, maxY } = {
+      minX: bounds.minX - 30,
+      minY: bounds.minY - 30,
+      maxX: bounds.maxX + 30,
+      maxY: bounds.maxY + 30,
+    };
+    const factor = Math.min(1, 4096 / (maxX - minX), 4096 / (maxY - minY));
+    const drawing = document.createElement('canvas');
+    drawing.width = Math.ceil((maxX - minX) * factor);
+    drawing.height = Math.ceil((maxY - minY) * factor);
+    const ctx = drawing.getContext('2d');
+    if (!ctx) return;
+    paint(ctx, strokes, factor, { x: -minX * factor, y: -minY * factor });
+    ctx.globalCompositeOperation = 'destination-over';
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, drawing.width, drawing.height);
+    drawing.toBlob((blob) => {
+      if (!blob) return;
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement('a');
+      anchor.href = url;
+      anchor.download = `whiteboard-${access.meetingId}.png`;
+      anchor.click();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+    });
   };
-
-  const undo = () => {
-    const id = drawOrder.current.pop();
-    if (!id) return;
-    undone.current.push(id);
-    redraw();
-  };
-
-  const redo = () => {
-    const id = undone.current.pop();
-    if (!id) return;
-    drawOrder.current.push(id);
-    redraw();
-  };
-
-  const exportPNG = () => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const url = canvas.toDataURL('image/png');
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `whiteboard-${Date.now()}.png`;
-    a.click();
-  };
-
-  // Use consistent icon components from the app (Brush, Close). For others, reuse existing shapes (Link/Settings) to avoid odd visuals.
-
   if (!open) return null;
-
   return (
-    <div ref={containerRef} className="absolute inset-0 z-40">
-      {/* Backdrop */}
-      <div className="absolute inset-0 bg-black/50" />
-
-      {/* Board */}
-      <div ref={overlayRef} className="absolute inset-6 rounded-xl bg-white shadow-xl overflow-hidden select-none">
-        <canvas ref={canvasRef} className="w-full h-full block" />
-        {/* Remote cursors */}
-        <div className="absolute inset-0 pointer-events-none">
-          {cursorList.map((c) => (
-            <div
-              key={c.id}
-              className="absolute -translate-x-1/2 -translate-y-1/2 w-3 h-3 rounded-full bg-emerald-500 shadow-[0_0_0_2px_#fff]"
-              style={{ left: c.x, top: c.y }}
-            />
-          ))}
-        </div>
-
-        {/* Toolbar */}
-        <div className="absolute top-3 left-3 flex items-center gap-2 bg-[rgba(32,33,36,0.75)] text-white rounded-full p-2 backdrop-blur-md">
+    <section className="whiteboard" aria-label="Shared whiteboard">
+      <header className="p-3 flex flex-wrap gap-2 items-center bg-white border-b border-hairline-gray">
+        <span className="text-sm font-medium mr-2">Whiteboard</span>
+        {(['pen', 'highlighter', 'eraser', 'pan'] as const).map((value) => (
           <button
-            className={clsx('w-9 h-9 rounded-full flex items-center justify-center hover:bg-white/10', tool === 'pen' && 'bg-white/10')}
-            title="Pen"
-            onClick={() => setTool('pen')}
+            key={value}
+            aria-pressed={tool === value}
+            disabled={value !== 'pan' && !canDraw}
+            className={`board-tool ${tool === value ? 'bg-blue-50 text-primary' : ''}`}
+            onClick={() => setTool(value)}
           >
-            <Brush width={18} height={18} />
+            {value === 'pan' ? 'Move' : value[0].toUpperCase() + value.slice(1)}
           </button>
-          <button
-            className={clsx('w-9 h-9 rounded-full flex items-center justify-center hover:bg-white/10', tool === 'highlighter' && 'bg-white/10')}
-            title="Highlighter"
-            onClick={() => setTool('highlighter')}
-          >
-            <Highlighter width={18} height={18} />
-          </button>
-          <button
-            className={clsx('w-9 h-9 rounded-full flex items-center justify-center hover:bg-white/10', tool === 'eraser' && 'bg-white/10')}
-            title="Eraser"
-            onClick={() => setTool('eraser')}
-          >
-            <Eraser width={18} height={18} />
-          </button>
-
-          <div className="w-px h-6 bg-white/20 mx-1" />
-
+        ))}
+        <input
+          aria-label="Drawing color"
+          type="color"
+          value={color}
+          onChange={(event) => setColor(event.target.value)}
+          className="w-8 h-8"
+          disabled={!canDraw}
+        />
+        <label className="flex items-center gap-2 text-xs">
+          Size
           <input
-            type="color"
-            value={color}
-            onChange={(e) => setColor(e.target.value)}
-            className="w-9 h-9 rounded-full overflow-hidden cursor-pointer border border-white/10 bg-white/10"
-            title="Color"
-          />
-          <input
+            aria-label="Brush size"
             type="range"
             min={1}
-            max={16}
+            max={12}
             value={width}
-            onChange={(e) => setWidth(parseInt(e.target.value))}
-            className="w-28 accent-white"
-            title="Size"
+            onChange={(event) => setWidth(Number(event.target.value))}
+            className="w-20"
+            disabled={!canDraw}
           />
-
-          <div className="w-px h-6 bg-white/20 mx-1" />
-          <button className="w-9 h-9 rounded-full flex items-center justify-center hover:bg-white/10" onClick={undo} title="Undo">
-            <Undo />
-          </button>
-          <button className="w-9 h-9 rounded-full flex items-center justify-center hover:bg-white/10" onClick={redo} title="Redo">
-            <Redo />
-          </button>
-          <button className="w-9 h-9 rounded-full flex items-center justify-center hover:bg-white/10" onClick={clearBoard} title="Clear">
-            <ClearIcon />
-          </button>
-          <button className="w-9 h-9 rounded-full flex items-center justify-center hover:bg-white/10" onClick={exportPNG} title="Export PNG">
-            <LinkIcon />
-          </button>
-        </div>
-
+        </label>
         <button
+          className="board-tool"
+          disabled={!lastOwn || !canDraw}
+          onClick={() =>
+            lastOwn &&
+            send({ kind: 'visibility', strokeId: lastOwn.id, visible: false })
+          }
+        >
+          Undo
+        </button>
+        <button
+          className="board-tool"
+          disabled={!lastHidden || !canDraw}
+          onClick={() =>
+            lastHidden &&
+            send({ kind: 'visibility', strokeId: lastHidden.id, visible: true })
+          }
+        >
+          Redo
+        </button>
+        {access.isHost && (
+          <button className="board-tool" onClick={() => setClearPrompt(true)}>
+            Clear
+          </button>
+        )}
+        <button className="board-tool" onClick={exportBoard}>
+          Export
+        </button>
+        <button
+          className="board-tool"
+          onClick={() => setTransform({ scale: 1, offset: { x: 0, y: 0 } })}
+        >
+          {Math.round(transform.scale * 100)}% · Reset
+        </button>
+        <button
+          aria-label="Close whiteboard"
           onClick={onClose}
-          className="absolute top-3 right-3 w-9 h-9 rounded-full flex items-center justify-center text-white hover:bg-white/10 bg-[rgba(32,33,36,0.75)]"
-          title="Close whiteboard"
+          className="ml-auto p-2 rounded-full hover:bg-light-gray"
         >
           <Close />
         </button>
-
-        {/* Hint */}
-        <div className="absolute bottom-3 left-3 text-[11px] text-black/60 bg-white/80 rounded-full px-3 py-1">
-          Shift+Drag or Middle-click to Pan · Ctrl+Wheel to Zoom
-        </div>
+      </header>
+      <div className="flex-1 min-h-0 relative bg-white">
+        <canvas
+          ref={canvas}
+          className="absolute inset-0 w-full h-full touch-none"
+          style={{
+            cursor: tool === 'pan' ? 'grab' : canDraw ? 'crosshair' : 'default',
+          }}
+          onPointerDown={down}
+          onPointerMove={move}
+          onPointerUp={end}
+          onPointerCancel={end}
+          onLostPointerCapture={end}
+        />
       </div>
-    </div>
+      <footer className="px-4 py-2 text-xs bg-light-gray flex justify-between gap-3">
+        <span>
+          {loading
+            ? 'Loading shared board…'
+            : !canDraw
+              ? 'Only the host can draw'
+              : 'Draw with mouse, touch, or pen. Shift-drag to move. Ctrl/⌘-scroll to zoom.'}
+        </span>
+        <span role="status">
+          {error ? (
+            <button className="text-meet-red underline" onClick={retry}>
+              {error} · Retry
+            </button>
+          ) : pending ? (
+            `Syncing ${pending} edits…`
+          ) : (
+            'All edits saved'
+          )}
+        </span>
+      </footer>
+      <Dialog
+        open={clearPrompt}
+        onClose={() => setClearPrompt(false)}
+        title="Clear the shared board?"
+      >
+        <p>This removes everyone’s drawings from the board.</p>
+        <button
+          className="primary-button mt-5"
+          onClick={() => {
+            send({ kind: 'clear' });
+            setClearPrompt(false);
+          }}
+        >
+          Clear for everyone
+        </button>
+      </Dialog>
+    </section>
   );
-};
-
-export default SmartWhiteboardOverlay;
+}
