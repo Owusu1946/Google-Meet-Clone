@@ -7,7 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint src --max-warnings 0",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "tsc --noEmit --project tsconfig.typecheck.json",
     "test": "tsx --test tests/*.test.ts",
     "setup:stream": "node --env-file=.env scripts/setup-stream.mjs",
     "format": "prettier --write src scripts tests *.json next.config.mjs",

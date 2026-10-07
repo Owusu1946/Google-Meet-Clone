@@ -11,9 +11,23 @@ export type DevicePreferences = {
 export const DEFAULT_DEVICES: DevicePreferences = { mic: false, camera: false };
 export function readDevicePreferences(): DevicePreferences {
   try {
+    const value: unknown = JSON.parse(
+      localStorage.getItem('meet-devices') || '{}',
+    );
+    if (!value || typeof value !== 'object') return DEFAULT_DEVICES;
+    const saved = value as Record<string, unknown>;
     return {
-      ...DEFAULT_DEVICES,
-      ...JSON.parse(localStorage.getItem('meet-devices') || '{}'),
+      mic: saved.mic === true,
+      camera: saved.camera === true,
+      ...Object.fromEntries(
+        ['audioId', 'videoId', 'speakerId']
+          .filter(
+            (key) =>
+              typeof saved[key] === 'string' &&
+              (saved[key] as string).length <= 512,
+          )
+          .map((key) => [key, saved[key]]),
+      ),
     };
   } catch {
     return DEFAULT_DEVICES;
@@ -86,6 +100,22 @@ export default function usePreviewMedia() {
       if (cancelled) {
         next.getTracks().forEach((track) => track.stop());
         return;
+      }
+      for (const track of next.getTracks()) {
+        track.addEventListener(
+          'ended',
+          () => {
+            if (cancelled) return;
+            setError(
+              `${track.kind === 'video' ? 'Camera' : 'Microphone'} disconnected. Choose another device or turn it back on.`,
+            );
+            setPreferences((current) => ({
+              ...current,
+              [track.kind === 'video' ? 'camera' : 'mic']: false,
+            }));
+          },
+          { once: true },
+        );
       }
       active.current = next;
       setStream(next);

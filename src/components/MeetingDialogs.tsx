@@ -109,6 +109,22 @@ export default function MeetingDialogs() {
             <>
               <button
                 className="option-button"
+                disabled={busy}
+                onClick={() => {
+                  setMenu(false);
+                  void run(() =>
+                    hostAction('settings', {
+                      boardPresenting: room.custom.boardPresenting !== true,
+                    }),
+                  );
+                }}
+              >
+                {room.custom.boardPresenting
+                  ? 'Stop presenting whiteboard'
+                  : 'Present whiteboard to everyone'}
+              </button>
+              <button
+                className="option-button"
                 onClick={() => {
                   setPanel('host');
                   setMenu(false);

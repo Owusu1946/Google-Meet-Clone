@@ -67,9 +67,20 @@ export function requestChannel(id: string, userId: string) {
   return chatServer().channel(REQUEST_TYPE, `${id}_${userId}`);
 }
 export async function addMember(id: string, userId: string) {
-  await meetingCall(id).updateCallMembers({
-    update_members: [{ user_id: userId, role: 'call_member' }],
-  });
-  for (const type of [CHAT_TYPE, BOARD_TYPE])
-    await chatServer().channel(type, id).addMembers([userId]);
+  // Complete collaboration memberships before opening the video admission gate.
+  // Roll back the exact memberships added here if any service write fails.
+  const channels = [CHAT_TYPE, BOARD_TYPE].map((type) =>
+    chatServer().channel(type, id),
+  );
+  try {
+    for (const channel of channels) await channel.addMembers([userId]);
+    await meetingCall(id).updateCallMembers({
+      update_members: [{ user_id: userId, role: 'call_member' }],
+    });
+  } catch (error) {
+    await Promise.allSettled(
+      channels.map((channel) => channel.removeMembers([userId])),
+    );
+    throw error;
+  }
 }

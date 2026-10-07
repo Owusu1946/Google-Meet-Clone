@@ -13,6 +13,7 @@
 /.next/
 /.next-verify/
 /.next-build/
+/.next-ci/
 /out/
 
 # production

@@ -1,6 +1,6 @@
 # Meeting project audit
 
-Reviewed 7 October 2026. This is a source and local tooling audit, not a completed multi-browser end-to-end test. Application code has not been changed.
+Original audit: 7 October 2026. The findings below describe the pre-repair project. The resolution section at the end records the implementation and validation; browser/media acceptance remains separate.
 
 ## Verification
 
@@ -98,3 +98,35 @@ Recommended outcome: a shared board document with stable world coordinates, vali
 - Test narrow phones, tablet/desktop, keyboard navigation, screen-reader labels and focus restoration.
 
 Completing this matrix, including provider configuration checks, is necessary before claiming the project works end to end.
+
+
+## Resolution on branch `codex/complete-meeting-flows`
+
+All 45 findings have corresponding source changes or explicit removal of the incomplete control. This means implemented, not browser-certified. The original audit above is retained as the before-state.
+
+| Original findings | Implemented resolution | Verification boundary |
+| --- | --- | --- |
+| 1–2, 13–14, 17 | Server-owned Clerk/signed guest identity; short-lived tokens; explicit participant/host roles; dedicated membership-only call/chat types; persistent admission, denial, lock, moderation and end-for-everyone | Identity/body tests and live service/API checks; real Clerk login remains manual |
+| 3–12, 16, 39, 42, 44 | Cancelled connection lifecycle; safe Next 15 route contracts/raw webhooks; persisted meeting creation; code/link parsing; recoverable entry/exit; camera-off/muted defaults and independently requested devices; corrected images | Compiler/lint/tests/production build; device permissions, lifecycle and webhook delivery remain manual |
+| 15, 18–21, 37–38, 40, 43 | Active-speaker/presentation layouts; single side panel; actual SDK media indicators; session-scoped persistent hands; event-driven deduplicated reactions; native dialogs; mobile More menu; real blur; removed inert controls and legacy effects | Source/compiler validation; visual, keyboard, mobile and multi-user behavior remain manual |
+| 22–25 | Service captions with trusted speaker identity and expiring utterances; per-viewer visibility; language controls; service failures shown | Integration uses installed SDK and configured Stream type; actual speech/mute/overlap accuracy remains manual |
+| 26–35 | Pointer-only canvas with exact DPR sizing/world coordinates; deterministic complete repaint; anchored pan/zoom; bounded validated durable operations; paginated late-join history; synchronized own-stroke undo/redo; host-only clear/presentation; retry queue and guarded leave; whole-board export | Four replay/validation/transform tests plus live API idempotency/authorization checks; actual canvas/media input and concurrent rendering remain manual |
+| 36, 41 | Real optional Resend delivery with idempotency/privacy; copy/mailto fallback; host-only recording history after leaving and from home | Recording access checked through API; email delivery/processing/playback require configured providers and manual acceptance |
+| 45 | One pinned pnpm dependency graph; removed unused providers, SDK dependencies and legacy components; format/lint/typecheck/unit/live API scripts; CI; current setup docs and manual acceptance matrix | Deterministic checks and production build; CI and manual acceptance reported separately |
+
+### Configuration and compatibility
+
+- Dedicated Stream types were provisioned successfully. Existing `default` and `messaging` types and legacy meetings were preserved. New links use the secure `meet` type; old `default` links are not automatically migrated.
+- Video admission assigns `call_member` explicitly; membership without that role was caught by live verification and corrected.
+- No captions/recording job or invitation email was started by the agent. Provider setup, permissions, and recording access were checked separately from paid/media operations.
+- Browser opening was explicitly prohibited by the user. Run `MANUAL_TESTS.md` with at least two devices/profiles before claiming complete Google Meet parity or end-to-end media success.
+
+### Recorded validation
+
+- Stream provisioning: passed for all four dedicated types.
+- Lint: passed with zero warnings.
+- Source TypeScript check: passed; uses a separate config so live dev-generated files cannot invalidate the source check. Next build checks generated route types separately.
+- Deterministic tests: 7 passed (identity/forgery/expiry/origin/body validation, code parsing, board replay/ownership/limits/transforms).
+- Production API/service verification: 30 checks passed, including token identity, admission, outsider denial, direct board-write denial, chat writes, recording authorization, idempotent board retry, collaboration lock, removal, open entry and meeting end. Disposable fixtures were cleaned up. Transient network 503s were retried by the verification script.
+- Production compilation: passed with actual local project configuration; CI-style build with build-only public keys also compiled and generated all routes.
+- Browser, real Clerk login/creation, WebRTC media, speech caption quality, invitation delivery and recording playback: **not run**, per user instruction. Follow `MANUAL_TESTS.md`.

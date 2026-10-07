@@ -8,7 +8,11 @@ export default function useClickOutside(handler: () => void, shallow = false) {
       const element = domNode.current;
       const target = event.target;
       if (!element || !(target instanceof Node)) return;
-      if (!element.contains(target) && (!shallow || !element.parentElement?.contains(target))) latestHandler.current();
+      if (
+        !element.contains(target) &&
+        (!shallow || !element.parentElement?.contains(target))
+      )
+        latestHandler.current();
     };
     document.addEventListener('pointerdown', outside);
     return () => document.removeEventListener('pointerdown', outside);
