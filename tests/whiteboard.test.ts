@@ -2,6 +2,8 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   boardStrokes,
+  boardBatch,
+  canonicalBoardOperations,
   validOperation,
   viewToWorld,
   zoomAt,
@@ -82,4 +84,64 @@ test('zoom remains anchored to the pointer through pan and scale', () => {
     offset = { x: 10, y: -20 };
   const next = zoomAt(point, 1, 2, offset);
   assert.deepEqual(viewToWorld(point, 1, offset), viewToWorld(point, 2, next));
+});
+
+test('batches obey operation and byte limits without dropping queued operations', () => {
+  const operations = Array.from({ length: 20 }, (_, index) => ({
+    ...stroke(index),
+    id: `00000000-0000-0000-0000-${String(index).padStart(12, '0')}`,
+  }));
+  assert.ok(
+    boardBatch(operations).length > 0 && boardBatch(operations).length <= 16,
+  );
+  const large = operations.map((operation) => ({
+    ...operation,
+    points: Array.from({ length: 80 }, () => ({ x: 99999.99, y: 99999.99 })),
+  }));
+  const batch = boardBatch(large);
+  assert.ok(batch.length > 0 && batch.length < 16);
+  assert.ok(Buffer.byteLength(JSON.stringify(batch)) < 4000);
+  assert.equal(large.length, 20);
+});
+test('canonical batches preserve clear order even with identical service timestamps', () => {
+  const clear: BoardOperation = {
+    id: 'ffffffff-ffff-ffff-ffff-ffffffffffff',
+    actor: 'guest_ada',
+    kind: 'clear',
+    time: stroke().time,
+  };
+  const before = canonicalBoardOperations(
+    [stroke(), clear],
+    'guest_ada',
+    stroke().time,
+    'batch',
+  );
+  assert.deepEqual(boardStrokes([...before].reverse()), []);
+  const after = canonicalBoardOperations(
+    [clear, stroke()],
+    'guest_ada',
+    stroke().time,
+    'batch',
+  );
+  assert.equal(boardStrokes([...after].reverse()).length, 1);
+});
+test('canonical service history rejects spoofed authors and corrupt batches', () => {
+  assert.deepEqual(
+    canonicalBoardOperations([stroke()], 'other', stroke().time, 'batch'),
+    [],
+  );
+  assert.deepEqual(
+    canonicalBoardOperations(
+      [stroke(), {}],
+      'guest_ada',
+      stroke().time,
+      'batch',
+    ),
+    [],
+  );
+  assert.deepEqual(
+    canonicalBoardOperations(stroke(), 'guest_ada', 'invalid', 'batch'),
+    [],
+  );
+  assert.equal(validOperation({ ...stroke(), order: 16 }), false);
 });

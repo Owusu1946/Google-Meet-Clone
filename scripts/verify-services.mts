@@ -1,7 +1,13 @@
 import assert from 'node:assert/strict';
 import { randomInt, randomUUID } from 'node:crypto';
 import { StreamClient } from '@stream-io/node-sdk';
-import { StreamChat } from 'stream-chat';
+import {
+  StreamChat,
+  type EventTypes,
+  type Channel,
+  type Event,
+} from 'stream-chat';
+import { boardBatch } from '../src/lib/whiteboard';
 import { signGuest } from '../src/lib/server/guest-session';
 
 // Explicitly opt in: creates disposable fixtures in the configured Stream app.
@@ -36,6 +42,27 @@ const cookies = new Map(
 );
 const path = `/api/meetings/${id}`;
 let checks = 0;
+const realtimeClients: StreamChat[] = [];
+function nextEvent(
+  channel: Channel,
+  type: EventTypes,
+  matches: (event: Event) => boolean = () => true,
+) {
+  const waiting = new Promise<Event>((resolve, reject) => {
+    const timer = setTimeout(() => {
+      subscription.unsubscribe();
+      reject(new Error(`Timed out waiting for ${type}`));
+    }, 15000);
+    const subscription = channel.on(type, (event) => {
+      if (!matches(event)) return;
+      clearTimeout(timer);
+      subscription.unsubscribe();
+      resolve(event);
+    });
+  });
+  void waiting.catch(() => undefined);
+  return waiting;
+}
 async function request(
   route: string,
   user: string,
@@ -171,6 +198,78 @@ try {
     { message: { text: 'Verification message' } },
     true,
   );
+  // Authenticate two headless websocket clients; no browser or media capture.
+  for (const user of [host, applicant]) {
+    const client = new StreamChat(key, {
+      allowServerSideConnect: true,
+      timeout: 30000,
+    });
+    realtimeClients.push(client);
+    await client.connectUser({ id: user }, chat.createToken(user));
+  }
+  const sender = realtimeClients[1].channel('meet-chat', id);
+  const receiver = realtimeClients[0].channel('meet-chat', id);
+  await Promise.all([sender.watch(), receiver.watch()]);
+  await receiver.markRead();
+  const started = nextEvent(receiver, 'typing.start');
+  await sender.keystroke();
+  assert.equal((await started).user?.id, applicant);
+  checks++;
+  const stopped = nextEvent(receiver, 'typing.stop');
+  await sender.stopTyping();
+  assert.equal((await stopped).user?.id, applicant);
+  checks++;
+  const root = await sender.sendMessage({ text: 'Thread verification' });
+  const replyEvent = nextEvent(
+    receiver,
+    'message.new',
+    (event) => event.message?.parent_id === root.message.id,
+  );
+  await sender.sendMessage({
+    text: 'Reply verification',
+    parent_id: root.message.id,
+    show_in_channel: true,
+  });
+  assert.equal((await replyEvent).message?.parent_id, root.message.id);
+  checks++;
+  const replies = await receiver.getReplies(root.message.id, { limit: 50 });
+  assert.equal(replies.messages.length, 1);
+  checks++;
+  assert.ok(receiver.countUnread() >= 2);
+  checks++;
+  const readEvent = nextEvent(receiver, 'message.read');
+  await receiver.markRead();
+  await readEvent;
+  assert.equal(receiver.countUnread(), 0);
+  checks++;
+  const boardSender = realtimeClients[1].channel('meet-board', id);
+  const boardReceiver = realtimeClients[0].channel('meet-board', id);
+  await Promise.all([boardSender.watch(), boardReceiver.watch()]);
+  const preview = nextEvent(boardReceiver, 'board_preview' as EventTypes);
+  const previewOperation = {
+    id: randomUUID(),
+    actor: applicant,
+    time: new Date().toISOString(),
+    kind: 'stroke',
+    strokeId: `${applicant}:${randomUUID()}`,
+    segment: 0,
+    points: Array.from({ length: 80 }, (_, index) => ({ x: index, y: index })),
+    color: '#202124',
+    mode: 'pen',
+    width: 3,
+  };
+  const previewStart = performance.now();
+  await boardSender.sendEvent({
+    type: 'board_preview' as EventTypes,
+    operations: [previewOperation],
+  });
+  const delivered = await preview;
+  assert.equal(delivered.user?.id, applicant);
+  assert.deepEqual(delivered.operations, [previewOperation]);
+  checks++;
+  console.log(
+    `Authenticated board preview delivered in ${Math.round(performance.now() - previewStart)}ms (one sample, not a production latency guarantee).`,
+  );
   await request(`${path}/recordings`, applicant, undefined, 403);
   await request(`${path}/recordings`, host);
   const stroke = {
@@ -193,6 +292,35 @@ try {
     retry.operation,
     'Board retry must preserve canonical operation and timestamp.',
   );
+  const batch = {
+    operations: [
+      { ...stroke, id: randomUUID() },
+      { ...stroke, id: randomUUID(), segment: 1 },
+    ],
+  };
+  const batchSaved = await request(`${path}/board`, applicant, batch);
+  const batchRetried = await request(`${path}/board`, applicant, batch);
+  assert.deepEqual(batchSaved.operations, batchRetried.operations);
+  assert.equal(batchSaved.operations.length, 2);
+  checks++;
+  const heavy = boardBatch(
+    Array.from({ length: 16 }, (_, segment) => ({
+      ...stroke,
+      id: randomUUID(),
+      actor: applicant,
+      time: new Date().toISOString(),
+      segment,
+      points: Array.from({ length: 80 }, () => ({ x: 99999.99, y: 99999.99 })),
+      kind: 'stroke' as const,
+      mode: 'pen' as const,
+    })),
+  );
+  const heavySaved = await request(`${path}/board`, applicant, {
+    operations: heavy,
+  });
+  assert.equal(heavySaved.operations.length, heavy.length);
+  checks++;
+
   await request(
     `${path}/board`,
     applicant,
@@ -246,6 +374,9 @@ try {
   );
   process.exitCode = 1;
 } finally {
+  await Promise.allSettled(
+    realtimeClients.map((client) => client.disconnectUser()),
+  );
   // Delete only exact fixture IDs created above. Existing meetings are untouched.
   const cleanup = await Promise.allSettled([
     ...['meet-chat', 'meet-board'].map((type) =>

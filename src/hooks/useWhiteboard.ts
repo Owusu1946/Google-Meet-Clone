@@ -221,6 +221,10 @@ export default function useWhiteboard() {
       try {
         while (queue.current.length && mounted.current) {
           const batch = boardBatch(queue.current);
+          if (!batch.length)
+            throw new Error(
+              'A pending drawing exceeds the service size limit.',
+            );
           const response = await api<{ operations: BoardOperation[] }>(
             `/api/meetings/${access.meetingId}/board`,
             { method: 'POST', body: JSON.stringify({ operations: batch }) },

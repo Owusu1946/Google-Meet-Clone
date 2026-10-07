@@ -117,14 +117,18 @@ function ChatConversation({
       void channel.stopTyping(parentId).catch(() => undefined);
     };
   }, [channel, parentId]);
+  const initialScroll = useRef(true);
   const lastMessage = messages.at(-1)?.id;
   useEffect(() => {
     const element = scroll.current;
+    if (!lastMessage) return;
     if (
       element &&
-      element.scrollHeight - element.scrollTop - element.clientHeight < 180
+      (initialScroll.current ||
+        element.scrollHeight - element.scrollTop - element.clientHeight < 180)
     )
       bottom.current?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+    initialScroll.current = false;
   }, [lastMessage]);
   const typingTimeout = useRef<ReturnType<typeof setTimeout> | undefined>(
     undefined,

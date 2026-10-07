@@ -138,7 +138,7 @@ export function boardBatch(operations: BoardOperation[]): BoardOperation[] {
   let bytes = 64;
   for (const operation of operations.slice(0, 16)) {
     const size = new TextEncoder().encode(JSON.stringify(operation)).length + 1;
-    if (bytes + size > 24_000) break;
+    if (bytes + size > 4_000) break;
     batch.push(operation);
     bytes += size;
   }

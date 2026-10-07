@@ -125,12 +125,20 @@ export default function SmartWhiteboardOverlay({
     });
     return () => cancelAnimationFrame(frame);
   }, [open, size, visibleStrokes, transform]);
+  const draftFrame = useRef<number | undefined>(undefined);
+  useEffect(
+    () => () => {
+      if (draftFrame.current !== undefined)
+        cancelAnimationFrame(draftFrame.current);
+    },
+    [],
+  );
   const flushDraft = useCallback(
     (finish: boolean) => {
       const stroke = active.current;
       if (!stroke) return;
       while (sent.current < stroke.points.length) {
-        const points = stroke.points.slice(sent.current, sent.current + 256);
+        const points = stroke.points.slice(sent.current, sent.current + 80);
         send({
           kind: 'stroke',
           strokeId: stroke.id,
@@ -222,10 +230,15 @@ export default function SmartWhiteboardOverlay({
       x: Math.round(world.x * 100) / 100,
       y: Math.round(world.y * 100) / 100,
     });
-    setDraft({ ...active.current, points: [...active.current.points] });
+    if (draftFrame.current === undefined)
+      draftFrame.current = requestAnimationFrame(() => {
+        draftFrame.current = undefined;
+        if (active.current)
+          setDraft({ ...active.current, points: [...active.current.points] });
+      });
     if (
       performance.now() - lastFlush.current > 80 ||
-      active.current.points.length - sent.current >= 256
+      active.current.points.length - sent.current >= 80
     ) {
       lastFlush.current = performance.now();
       flushDraft(false);
