@@ -1,30 +1,23 @@
-import { StreamClient } from '@stream-io/node-sdk';
-
-const API_KEY = process.env.NEXT_PUBLIC_STREAM_API_KEY!;
-const SECRET = process.env.STREAM_API_SECRET!;
+import { identity } from '@/lib/server/identity';
+import {
+  assertSameOrigin,
+  failure,
+  json,
+  readBody,
+  HttpError,
+} from '@/lib/server/http';
+import { syncIdentity } from '@/lib/server/stream';
 
 export async function POST(request: Request) {
-  const client = new StreamClient(API_KEY, SECRET);
-
-  const body = await request.json();
-
-  const user = body?.user;
-
-  if (!user) {
-    return Response.error();
+  try {
+    assertSameOrigin(request);
+    const body = await readBody(request);
+    if (typeof body.name !== 'string')
+      throw new HttpError(400, 'Name is required.');
+    const user = await identity({ createGuest: true, name: body.name });
+    await syncIdentity(user);
+    return json({ identity: user });
+  } catch (error) {
+    return failure(error);
   }
-
-  const response = await client.updateUsersPartial({
-    users: [
-      {
-        id: user.id,
-        set: {
-          name: user.name,
-          role: 'user',
-        },
-      },
-    ],
-  });
-
-  return Response.json(response);
 }

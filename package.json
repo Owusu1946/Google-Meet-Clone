@@ -6,35 +6,41 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "eslint src --max-warnings 0",
+    "typecheck": "tsc --noEmit --project tsconfig.typecheck.json",
+    "test": "tsx --test tests/*.test.ts",
+    "setup:stream": "node --env-file=.env scripts/setup-stream.mjs",
+    "format": "prettier --write src scripts tests *.json next.config.mjs",
+    "format:check": "prettier --check src scripts tests *.json next.config.mjs",
+    "verify:services": "node --env-file=.env --import tsx scripts/verify-services.mts"
   },
   "dependencies": {
-    "@clerk/nextjs": "^5.3.0",
-    "@gsap/react": "^2.1.1",
-    "@heygen/streaming-avatar": "^2.1.0",
-    "@stream-io/node-sdk": "^0.4.0",
-    "@stream-io/video-react-sdk": "^1.2.20",
-    "clsx": "^2.1.1",
-    "gsap": "^3.12.5",
-    "livekit-client": "^2.15.13",
-    "nanoid": "^5.0.7",
-    "next": "^15.0.0-rc.0",
-    "react": "^19.0.0-rc-e56f4ae3-20240830",
-    "react-dom": "^19.0.0-rc-e56f4ae3-20240830",
-    "stream-chat": "^8.37.0",
-    "stream-chat-react": "^11.23.5",
-    "svix": "^1.32.0"
+    "@clerk/nextjs": "6.39.7",
+    "@stream-io/node-sdk": "0.4.26",
+    "@stream-io/video-client": "1.61.1",
+    "@stream-io/video-react-sdk": "1.43.3",
+    "clsx": "2.1.1",
+    "gsap": "3.15.0",
+    "next": "15.5.27",
+    "react": "19.3.0",
+    "react-dom": "19.3.0",
+    "stream-chat": "8.61.0",
+    "svix": "1.99.1"
   },
   "devDependencies": {
-    "@types/node": "^20",
-    "@types/react": "^18",
-    "@types/react-dom": "^18",
-    "concurrently": "^8.2.2",
-    "detect-port": "^1.6.1",
-    "eslint": "^8",
-    "eslint-config-next": "^15.0.0-rc.0",
-    "postcss": "^8",
-    "tailwindcss": "^3.4.1",
-    "typescript": "^5"
+    "@types/node": "20.19.43",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "eslint": "8.57.1",
+    "eslint-config-next": "15.5.27",
+    "postcss": "8.5.29",
+    "prettier": "^3.9.9",
+    "tailwindcss": "3.4.19",
+    "tsx": "^4.20.0",
+    "typescript": "5.9.3"
+  },
+  "packageManager": "pnpm@10.33.0",
+  "engines": {
+    "node": ">=22.13.0"
   }
 }

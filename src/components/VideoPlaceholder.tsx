@@ -15,7 +15,7 @@ const VideoPlaceholder = forwardRef<HTMLDivElement, VideoPlaceholderProps>(
   function VideoPlaceholder({ style }, ref) {
     const color = useUserColor();
     const { participant } = useParticipantViewContext();
-    const name = participant.name || participant.userId;
+    const name = participant.name || participant.userId || 'Participant';
 
     const randomColor = useMemo(() => {
       return color(name);
@@ -30,6 +30,7 @@ const VideoPlaceholder = forwardRef<HTMLDivElement, VideoPlaceholderProps>(
         {participant.image && (
           <Image
             className="max-w-3/10 rounded-full overflow-hidden"
+            unoptimized
             src={participant.image}
             alt={participant.userId}
             width={WIDTH}
@@ -42,7 +43,7 @@ const VideoPlaceholder = forwardRef<HTMLDivElement, VideoPlaceholderProps>(
           }}
           className={clsx(
             participant.image && 'hidden',
-            'relative avatar w-3/10 max-w-40 aspect-square uppercase rounded-full text-white font-sans-serif font-medium flex items-center justify-center'
+            'relative avatar w-3/10 max-w-40 aspect-square uppercase rounded-full text-white font-sans-serif font-medium flex items-center justify-center',
           )}
         >
           <span className="text-[clamp(30px,_calc(100vw_*_0.05),_65px)] select-none">
@@ -51,7 +52,7 @@ const VideoPlaceholder = forwardRef<HTMLDivElement, VideoPlaceholderProps>(
         </div>
       </div>
     );
-  }
+  },
 );
 
 export default VideoPlaceholder;

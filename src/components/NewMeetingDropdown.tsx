@@ -1,5 +1,5 @@
 'use client';
-import { MutableRefObject, ReactNode } from 'react';
+import { MutableRefObject, ReactNode, useEffect } from 'react';
 import clsx from 'clsx';
 
 import useClickOutside from '../hooks/useClickOutside';
@@ -25,13 +25,22 @@ const NewMeetingDropdown = ({
     onClose();
   }) as MutableRefObject<HTMLDivElement>;
 
+  useEffect(() => {
+    if (!isOpen) return;
+    const close = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') onClose();
+    };
+    document.addEventListener('keydown', close);
+    domNode.current?.querySelector('button')?.focus();
+    return () => document.removeEventListener('keydown', close);
+  }, [isOpen, onClose, domNode]);
   if (!isOpen) return null;
 
   return (
     <div
       ref={domNode}
       className={clsx(
-        'absolute z-50 mt-2 w-72 bg-white rounded-lg shadow-[0_2px_10px_rgba(0,0,0,0.2)] py-2 animate-fade-in'
+        'absolute z-50 mt-2 w-72 bg-white rounded-lg shadow-[0_2px_10px_rgba(0,0,0,0.2)] py-2 animate-fade-in',
       )}
     >
       {options.map((option, index) => (

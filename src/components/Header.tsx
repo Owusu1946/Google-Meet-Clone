@@ -1,94 +1,72 @@
-import { SignInButton, UserButton, useUser } from '@clerk/nextjs';
-import clsx from 'clsx';
-
-import Apps from './icons/Apps';
-import Avatar from './Avatar';
-import Feedback from './icons/Feedback';
-import Help from './icons/Help';
-import IconButton from './IconButton';
-import PlainButton from './PlainButton';
+'use client';
+import { useState } from 'react';
+import Link from 'next/link';
+import { SignInButton, UserButton } from '@clerk/nextjs';
+import Dialog from './Dialog';
 import Videocam from './icons/Videocam';
-import Settings from './icons/Settings';
-import useTime from '../hooks/useTime';
+import useTime from '@/hooks/useTime';
 
-interface HeaderProps {
-  navItems?: boolean;
-}
-
-const Header = ({ navItems = true }: HeaderProps) => {
-  const { isLoaded, isSignedIn, user } = useUser();
+export default function Header({ navItems = true }: { navItems?: boolean }) {
   const { currentDateTime } = useTime();
-  const email = user?.primaryEmailAddress?.emailAddress;
-
+  const [help, setHelp] = useState(false);
   return (
-    <header className="w-full px-4 pt-4 flex items-center justify-between bg-white">
-      <div className="w-60 max-w-full">
-        <a href="/#" className="flex items-center gap-2 w-full">
-          <Videocam width={40} height={40} color="var(--primary)" />
-          <div className="font-product-sans text-2xl leading-6 text-meet-gray select-none">
-            <span className="font-medium">Google </span>
-            <span>Meet</span>
-          </div>
-        </a>
-      </div>
-      <div className="flex items-center cursor-default">
+    <header className="px-5 py-4 flex justify-between items-center gap-4">
+      <Link
+        href="/"
+        className="flex items-center gap-2 text-2xl text-meet-gray"
+      >
+        <Videocam width={36} height={36} color="#1a73e8" />
+        <span>
+          Meet <span className="text-sm">Clone</span>
+        </span>
+      </Link>
+      <div className="flex items-center gap-5">
         {navItems && (
           <>
-            <div className="hidden md:block mr-2 text-lg leading-4.5 text-meet-gray select-none">
+            <time
+              suppressHydrationWarning
+              className="hidden md:block text-meet-gray"
+            >
               {currentDateTime}
-            </div>
-            <div className="hidden sm:contents [&>button]:mx-2.5">
-              <IconButton title="Support" icon={<Help />} />
-              <IconButton title="Report a problem" icon={<Feedback />} />
-              <IconButton title="Settings" icon={<Settings />} />
-            </div>
+            </time>
+            <button
+              className="text-sm text-primary"
+              onClick={() => setHelp(true)}
+            >
+              Help
+            </button>
           </>
         )}
-        <div className="ml-2 flex items-center justify-end w-[6.5625rem] lg:ml-5">
-          {navItems && (
-            <div className="hidden sm:block">
-              <IconButton title="Google apps" icon={<Apps />} />
-            </div>
-          )}
-          <div
-            className={clsx(
-              'w-[3.04rem] grow flex items-center justify-end [&_img]:w-9 [&_span]:w-9 [&_img]:h-9 [&_span]:h-9',
-              isLoaded ? 'animate-fade-in' : 'opacity-0'
-            )}
-          >
-            {isSignedIn ? (
-              <>
-                {!navItems && (
-                  <div className="hidden sm:block mr-3 font-roboto leading-4 text-right text-meet-black">
-                    <div className="text-sm leading-4">{email}</div>
-                    <div className="text-sm hover:text-meet-blue cursor-pointer">
-                      Switch account
-                    </div>
-                  </div>
-                )}
-                <div className="relative h-9">
-                  <UserButton />
-                  <div className="absolute left-0 top-0 flex items-center justify-center pointer-events-none">
-                    <Avatar
-                      participant={{
-                        name: user?.fullName,
-                        image: user.hasImage ? user.imageUrl : undefined,
-                      }}
-                      width={36}
-                    />
-                  </div>
-                </div>
-              </>
-            ) : (
-              <SignInButton>
-                <PlainButton size="sm">Sign In</PlainButton>
-              </SignInButton>
-            )}
-          </div>
-        </div>
+        <UserButton
+          fallback={
+            <SignInButton mode="modal">
+              <button className="text-primary text-sm">Sign in</button>
+            </SignInButton>
+          }
+        />
       </div>
+      <Dialog open={help} onClose={() => setHelp(false)} title="Meeting help">
+        <div className="space-y-4 text-sm leading-6">
+          <p>
+            Create a meeting after signing in, then copy its link. Guests can
+            enter their name and ask the host to join.
+          </p>
+          <p>
+            Use the microphone and camera controls to enable devices. Allow
+            access in your browser when prompted. Device selection is available
+            in meeting settings.
+          </p>
+          <p>
+            During a meeting, use the More options menu for captions,
+            whiteboard, recordings, and settings. The host can admit people and
+            manage access from Host controls.
+          </p>
+          <p>
+            Keyboard shortcuts: Ctrl/⌘ + D toggles your microphone, Ctrl/⌘ + E
+            toggles your camera, and Escape closes the current panel.
+          </p>
+        </div>
+      </Dialog>
     </header>
   );
-};
-
-export default Header;
+}

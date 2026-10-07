@@ -1,235 +1,107 @@
 'use client';
-import { useEffect, useState } from 'react';
-import { createPortal } from 'react-dom';
-import Image from 'next/image';
-import clsx from 'clsx';
-
-import Close from './icons/Close';
-import PersonAdd from './icons/PersonAdd';
-
-interface Contact {
-  id: string;
-  name: string;
-  email: string;
-  avatar?: string;
-}
-
-interface AddPeoplePopupProps {
+import { useEffect, useRef, useState } from 'react';
+import Dialog from './Dialog';
+import Clipboard from './Clipboard';
+import { api, errorMessage } from '@/lib/meeting';
+export default function AddPeoplePopup({
+  isOpen,
+  onClose,
+  meetingId,
+}: {
   isOpen: boolean;
   onClose: () => void;
-  onInvite?: (selectedEmails: string[]) => void;
-}
-
-const AddPeoplePopup = ({ isOpen, onClose, onInvite }: AddPeoplePopupProps) => {
-  const [searchTerm, setSearchTerm] = useState('');
-  const [selectedContacts, setSelectedContacts] = useState<Set<string>>(
-    new Set()
-  );
-
-  // Mock suggested contacts - in production, these would come from your backend/Clerk
-  const suggestedContacts: Contact[] = [
-    {
-      id: '1',
-      name: 'John Doe',
-      email: 'john.doe@example.com',
-    },
-    {
-      id: '2',
-      name: 'Jane Smith',
-      email: 'jane.smith@example.com',
-    },
-    {
-      id: '3',
-      name: 'Bob Wilson',
-      email: 'bob.wilson@example.com',
-    },
-  ];
-
-  const filteredContacts = suggestedContacts.filter(
-    (contact) =>
-      contact.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      contact.email.toLowerCase().includes(searchTerm.toLowerCase())
-  );
-
-  const handleToggleContact = (email: string) => {
-    const newSelected = new Set(selectedContacts);
-    if (newSelected.has(email)) {
-      newSelected.delete(email);
-    } else {
-      newSelected.add(email);
-    }
-    setSelectedContacts(newSelected);
-  };
-
-  const handleInvite = () => {
-    if (onInvite) {
-      onInvite(Array.from(selectedContacts));
-    }
-    setSelectedContacts(new Set());
-    setSearchTerm('');
-    onClose();
-  };
-
-  const getInitials = (name: string) => {
-    return name
-      .split(' ')
-      .map((n) => n[0])
-      .join('')
-      .toUpperCase()
-      .substring(0, 2);
-  };
-
-  const getAvatarColor = (email: string) => {
-    const colors = [
-      'bg-blue-500',
-      'bg-green-500',
-      'bg-purple-500',
-      'bg-pink-500',
-      'bg-orange-500',
-      'bg-teal-500',
-    ];
-    const index =
-      email.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0) %
-      colors.length;
-    return colors[index];
-  };
-
-  const [mounted, setMounted] = useState(false);
-  
+  meetingId: string;
+}) {
+  const [text, setText] = useState('');
+  const [enabled, setEnabled] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [status, setStatus] = useState('');
+  const requestId = useRef('');
   useEffect(() => {
-    setMounted(true);
-  }, []);
-
-  if (!isOpen || !mounted) return null;
-
-  return createPortal(
-    <>
-      {/* Backdrop */}
-      <div
-        className="fixed inset-0 bg-black/50 z-40 animate-fade-in"
-        onClick={onClose}
-      />
-
-      {/* Modal Wrapper */}
-      <div className="fixed inset-0 z-50 flex items-center justify-center p-4 pointer-events-none">
-        {/* Modal */}
-        <div className="bg-white rounded-lg shadow-2xl w-full max-w-md pointer-events-auto">
-        {/* Header */}
-        <div className="flex items-center justify-between px-6 pt-6 pb-4 border-b border-gray-200">
-          <h2 className="text-xl font-medium text-meet-black">Add people</h2>
-          <button
-            onClick={onClose}
-            className="hover:bg-gray-100 rounded-full p-2 transition-colors"
-            aria-label="Close"
-          >
-            <Close />
-          </button>
-        </div>
-
-        {/* Invite Tab */}
-        <div className="px-6 pt-4">
-          <button className="flex items-center gap-2 text-primary font-medium text-sm pb-2 border-b-2 border-primary">
-            <PersonAdd />
-            <span>Invite</span>
-          </button>
-        </div>
-
-        {/* Search Input */}
-        <div className="px-6 pt-4 pb-2">
-          <input
-            type="text"
-            placeholder="Enter name or email"
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent text-sm"
-          />
-        </div>
-
-        {/* Suggested Contacts */}
-        <div className="px-6 py-2 max-h-80 overflow-y-auto">
-          {searchTerm === '' && (
-            <p className="text-xs text-gray-500 mb-2 font-medium">
-              Suggested contacts
-            </p>
-          )}
-          {filteredContacts.length === 0 && searchTerm !== '' && (
-            <p className="text-sm text-gray-500 py-4 text-center">
-              No contacts found
-            </p>
-          )}
-          {filteredContacts.map((contact) => (
-            <div
-              key={contact.id}
-              className="flex items-center gap-3 py-3 hover:bg-gray-50 rounded-lg px-2 cursor-pointer transition-colors"
-              onClick={() => handleToggleContact(contact.email)}
-            >
-              {/* Avatar */}
-              <div
-                className={clsx(
-                  'w-10 h-10 rounded-full flex items-center justify-center text-white font-medium text-sm flex-shrink-0',
-                  contact.avatar ? '' : getAvatarColor(contact.email)
-                )}
-              >
-                {contact.avatar ? (
-                  <Image
-                    src={contact.avatar}
-                    alt={contact.name}
-                    width={40}
-                    height={40}
-                    className="rounded-full object-cover"
-                  />
-                ) : (
-                  getInitials(contact.name)
-                )}
-              </div>
-
-              {/* Contact Info */}
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-meet-black truncate">
-                  {contact.name}
-                </p>
-                <p className="text-xs text-gray-600 truncate">
-                  {contact.email}
-                </p>
-              </div>
-
-              {/* Checkbox */}
-              <input
-                type="checkbox"
-                checked={selectedContacts.has(contact.email)}
-                onChange={() => handleToggleContact(contact.email)}
-                className="w-5 h-5 text-primary border-gray-300 rounded focus:ring-primary cursor-pointer"
-              />
-            </div>
-          ))}
-        </div>
-
-        {/* Action Buttons */}
-        <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-gray-200">
-          <button
-            onClick={onClose}
-            className="px-6 py-2 text-sm font-medium text-primary hover:bg-blue-50 rounded transition-colors"
-          >
-            Cancel
-          </button>
-          <button
-            onClick={handleInvite}
-            disabled={selectedContacts.size === 0}
-            className={clsx(
-              'px-6 py-2 text-sm font-medium rounded transition-colors',
-              selectedContacts.size > 0
-                ? 'bg-primary text-white hover:bg-blue-600'
-                : 'bg-gray-200 text-gray-400 cursor-not-allowed'
-            )}
-          >
-            Invite ({selectedContacts.size})
-          </button>
-        </div>
-        </div>
-      </div>
-    </>,
-    document.body
+    if (!isOpen) return;
+    requestId.current = crypto.randomUUID();
+    setStatus('');
+    const controller = new AbortController();
+    void api<{ emailEnabled: boolean }>(`/api/meetings/${meetingId}/invites`, {
+      signal: controller.signal,
+    })
+      .then((result) => setEnabled(result.emailEnabled))
+      .catch(() => setEnabled(false));
+    return () => controller.abort();
+  }, [isOpen, meetingId]);
+  const emails = [...new Set(text.split(/[,;\s]+/).filter(Boolean))];
+  const valid =
+    emails.length > 0 &&
+    emails.length <= 10 &&
+    emails.every((email) => /^[^\s@,]+@[^\s@,]+\.[^\s@,]+$/.test(email));
+  const link =
+    typeof window === 'undefined'
+      ? ''
+      : `${window.location.origin}/${meetingId}`;
+  const send = async () => {
+    if (!valid || busy) return;
+    setBusy(true);
+    setStatus('');
+    try {
+      const result = await api<{ sent: number }>(
+        `/api/meetings/${meetingId}/invites`,
+        {
+          method: 'POST',
+          body: JSON.stringify({ emails, requestId: requestId.current }),
+        },
+      );
+      setStatus(
+        `Sent ${result.sent} invitation${result.sent === 1 ? '' : 's'}.`,
+      );
+      requestId.current = crypto.randomUUID();
+      setText('');
+    } catch (failure) {
+      setStatus(errorMessage(failure));
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <Dialog open={isOpen} onClose={onClose} title="Invite people">
+      <p className="text-sm text-meet-gray mb-4">
+        Share the link or invite up to 10 people by email. New participants
+        still follow your meeting admission settings.
+      </p>
+      <Clipboard value={link} />
+      <label className="block text-sm mt-5">
+        Email addresses
+        <textarea
+          className="w-full border rounded-xl p-3 mt-2"
+          disabled={busy}
+          rows={3}
+          placeholder="ada@example.com, kojo@example.com"
+          value={text}
+          onChange={(event) => {
+            setText(event.target.value);
+            requestId.current = crypto.randomUUID();
+          }}
+        />
+      </label>
+      {enabled ? (
+        <button
+          className="primary-button mt-4"
+          disabled={!valid || busy}
+          onClick={() => void send()}
+        >
+          {busy ? 'Sending…' : 'Send invitations'}
+        </button>
+      ) : (
+        <a
+          aria-disabled={!valid}
+          className={`primary-button inline-block mt-4 ${valid ? '' : 'opacity-40 pointer-events-none'}`}
+          href={`mailto:${emails.map(encodeURIComponent).join(',')}?subject=${encodeURIComponent('Meeting invitation')}&body=${encodeURIComponent(`Join our meeting: ${link}`)}`}
+        >
+          Open email app
+        </a>
+      )}
+      <p role="status" className="text-sm mt-4">
+        {status}
+      </p>
+    </Dialog>
   );
-};
-
-export default AddPeoplePopup;
+}

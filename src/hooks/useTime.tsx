@@ -35,7 +35,7 @@ const useTime = () => {
 
       return `${timeString} • ${dayString}, ${monthString}`;
     },
-    [getTimeString]
+    [getTimeString],
   );
 
   const currentDateTime = useMemo(() => formatTime(time), [time, formatTime]);

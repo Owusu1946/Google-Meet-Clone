@@ -13,7 +13,6 @@ import {
 import clsx from 'clsx';
 
 import ParticipantViewUI from './ParticipantViewUI';
-import useAnimateVideoLayout from '../hooks/useAnimateVideoLayout';
 import VideoPlaceholder from './VideoPlaceholder';
 
 const GROUP_SIZE = 6;
@@ -24,11 +23,9 @@ const GridLayout = () => {
   const participants = useParticipants();
   const [page, setPage] = useState(0);
 
-  const { ref } = useAnimateVideoLayout(false);
-
   const pageCount = useMemo(
     () => Math.ceil(participants.length / GROUP_SIZE),
-    [participants]
+    [participants],
   );
 
   const participantGroups = useMemo(() => {
@@ -41,7 +38,8 @@ const GridLayout = () => {
     return groups;
   }, [participants]);
 
-  const selectedGroup = participantGroups[page];
+  const selectedGroup =
+    participantGroups[Math.min(page, Math.max(0, pageCount - 1))] || [];
 
   useEffect(() => {
     if (!call) return;
@@ -61,14 +59,14 @@ const GridLayout = () => {
 
   return (
     <div
-      ref={ref}
       className={clsx(
         'w-full relative overflow-hidden',
-        'str-video__paginated-grid-layout'
+        'str-video__paginated-grid-layout',
       )}
     >
       {pageCount > 1 && (
         <IconButton
+          aria-label="Previous participants"
           icon="caret-left"
           disabled={page === 0}
           onClick={() => setPage((currentPage) => Math.max(0, currentPage - 1))}
@@ -99,6 +97,7 @@ const GridLayout = () => {
       {pageCount > 1 && (
         <IconButton
           disabled={page === pageCount - 1}
+          aria-label="Next participants"
           icon="caret-right"
           onClick={() =>
             setPage((currentPage) => Math.min(pageCount - 1, currentPage + 1))

@@ -1,101 +1,52 @@
-import { useEffect, useState } from 'react';
 import {
-  combineComparators,
-  Comparator,
   hasScreenShare,
+  isPinned,
   ParticipantView,
-  pinned,
-  screenSharing,
-  StreamVideoParticipant,
-  useCall,
   useCallStateHooks,
 } from '@stream-io/video-react-sdk';
-
 import ParticipantViewUI from './ParticipantViewUI';
-import useAnimateVideoLayout from '../hooks/useAnimateVideoLayout';
 import VideoPlaceholder from './VideoPlaceholder';
-
-const SpeakerLayout = () => {
-  const call = useCall();
-  const { useParticipants } = useCallStateHooks();
-  const { ref } = useAnimateVideoLayout(true);
+export default function SpeakerLayout() {
+  const { useParticipants, useDominantSpeaker } = useCallStateHooks();
   const participants = useParticipants();
-
-  const [participantInSpotlight, ...otherParticipants] = participants;
-  const [participantsBar, setParticipantsBar] = useState<HTMLDivElement | null>(
-    null
+  const dominant = useDominantSpeaker();
+  const spotlight =
+    participants.find(hasScreenShare) ||
+    participants.find(isPinned) ||
+    dominant ||
+    participants[0];
+  const others = participants.filter(
+    (participant) => participant.sessionId !== spotlight?.sessionId,
   );
-
-  const getCustomSortingPreset = (): Comparator<StreamVideoParticipant> => {
-    return combineComparators(screenSharing, pinned);
-  };
-
-  useEffect(() => {
-    if (!call) return;
-    const customSortingPreset = getCustomSortingPreset();
-    call.setSortParticipantsBy(customSortingPreset);
-  }, [call]);
-
-  useEffect(() => {
-    if (!participantsBar || !call) return;
-
-    const cleanup = call.dynascaleManager.setViewport(participantsBar);
-
-    return () => cleanup();
-  }, [participantsBar, call]);
-
+  if (!spotlight)
+    return (
+      <div className="grid place-items-center h-full text-white">
+        Waiting for participants…
+      </div>
+    );
   return (
-    <div
-      ref={ref}
-      className="w-full relative overflow-hidden str-video__speaker-layout str-video__speaker-layout--variant-bottom"
-    >
-      <div className="str-video__speaker-layout__wrapper">
-        <div
-          className={
-            participants.length > 1
-              ? 'str-video__speaker-layout__spotlight'
-              : 'spotlight--one'
+    <div className="speaker-layout">
+      <div className="speaker-spotlight">
+        <ParticipantView
+          participant={spotlight}
+          trackType={
+            hasScreenShare(spotlight) ? 'screenShareTrack' : 'videoTrack'
           }
-        >
-          {call && participantInSpotlight && (
+          ParticipantViewUI={ParticipantViewUI}
+          VideoPlaceholder={VideoPlaceholder}
+        />
+      </div>
+      <div className="speaker-strip">
+        {others.map((participant) => (
+          <div key={participant.sessionId} className="speaker-tile">
             <ParticipantView
-              participant={participantInSpotlight}
-              trackType={
-                hasScreenShare(participantInSpotlight)
-                  ? 'screenShareTrack'
-                  : 'videoTrack'
-              }
+              participant={participant}
               ParticipantViewUI={ParticipantViewUI}
               VideoPlaceholder={VideoPlaceholder}
             />
-          )}
-        </div>
-        {call && otherParticipants.length > 0 && (
-          <div className="str-video__speaker-layout__participants-bar-buttons-wrapper">
-            <div className="str-video__speaker-layout__participants-bar-wrapper">
-              <div
-                ref={setParticipantsBar}
-                className="str-video__speaker-layout__participants-bar"
-              >
-                {otherParticipants.map((participant) => (
-                  <div
-                    key={participant.sessionId}
-                    className="str-video__speaker-layout__participant-tile"
-                  >
-                    <ParticipantView
-                      participant={participant}
-                      ParticipantViewUI={ParticipantViewUI}
-                      VideoPlaceholder={VideoPlaceholder}
-                    />
-                  </div>
-                ))}
-              </div>
-            </div>
           </div>
-        )}
+        ))}
       </div>
     </div>
   );
-};
-
-export default SpeakerLayout;
+}

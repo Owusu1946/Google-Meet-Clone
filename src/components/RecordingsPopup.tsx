@@ -1,51 +1,63 @@
-import { MutableRefObject, useEffect, useState } from 'react';
-import {
-  CallRecording,
-  CallRecordingList,
-  useCall,
-} from '@stream-io/video-react-sdk';
-
-import Popup from './Popup';
-import useClickOutside from '../hooks/useClickOutside';
-
-interface RecordingsPopupProps {
-  isOpen: boolean;
-  onClose: () => void;
-}
-
-const RecordingsPopup = ({ isOpen, onClose }: RecordingsPopupProps) => {
-  const call = useCall();
-  const [callRecordings, setCallRecordings] = useState<CallRecording[]>([]);
+'use client';
+import { useCallback, useEffect, useState } from 'react';
+import { api, errorMessage } from '@/lib/meeting';
+import type { CallRecording } from '@stream-io/node-sdk';
+export default function RecordingsPopup({ meetingId }: { meetingId: string }) {
+  const [recordings, setRecordings] = useState<CallRecording[]>([]);
   const [loading, setLoading] = useState(true);
-  const ref = useClickOutside(() => {
-    onClose();
-  }, true) as MutableRefObject<HTMLDivElement>;
-
-  useEffect(() => {
-    const fetchCallRecordings = async () => {
-      try {
-        const response = await call?.queryRecordings();
-        setCallRecordings(response?.recordings || []);
-      } catch (error) {
-        console.error(error);
-      }
+  const [error, setError] = useState('');
+  const load = useCallback(async () => {
+    setLoading(true);
+    setError('');
+    try {
+      const data = await api<{ recordings: CallRecording[] }>(
+        `/api/meetings/${meetingId}/recordings`,
+      );
+      setRecordings(data.recordings);
+    } catch (failure) {
+      setError(errorMessage(failure));
+    } finally {
       setLoading(false);
-    };
-
-    call && isOpen && fetchCallRecordings();
-  }, [call, isOpen]);
-
+    }
+  }, [meetingId]);
+  useEffect(() => {
+    void load();
+  }, [load]);
   return (
-    <Popup
-      ref={ref}
-      open={isOpen}
-      className="left-auto right-[0] bottom-[3.25rem] overflow-hidden !bg-container-gray shadow-[0_2px_2px_0_rgba(0,0,0,.14),0_3px_1px_-2px_rgba(0,0,0,.12),0_1px_5px_0_rgba(0,0,0,.2)]"
-    >
-      <div className="w-full min-h-[7rem] py-8 px-4">
-        <CallRecordingList callRecordings={callRecordings} loading={loading} />
-      </div>
-    </Popup>
+    <div className="p-5 space-y-4">
+      <p className="text-sm text-meet-gray">
+        Recordings may take a few minutes to process after recording stops. Only
+        the host can access them.
+      </p>
+      <button
+        className="text-primary text-sm"
+        disabled={loading}
+        onClick={() => void load()}
+      >
+        {loading ? 'Loading…' : 'Refresh recordings'}
+      </button>
+      {error && (
+        <p role="alert" className="text-meet-red text-sm">
+          {error}
+        </p>
+      )}
+      {!loading && !error && !recordings.length && (
+        <p className="text-sm">No recordings are ready yet.</p>
+      )}
+      {recordings.map((recording) => (
+        <a
+          key={`${recording.session_id}:${recording.filename}`}
+          href={recording.url}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="block border border-hairline-gray rounded-xl p-4"
+        >
+          <p className="text-primary text-sm">Play recording ↗</p>
+          <p className="text-xs text-meet-gray mt-2">
+            {new Date(recording.start_time).toLocaleString()}
+          </p>
+        </a>
+      ))}
+    </div>
   );
-};
-
-export default RecordingsPopup;
+}

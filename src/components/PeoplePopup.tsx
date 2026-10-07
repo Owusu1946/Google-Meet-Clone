@@ -1,123 +1,121 @@
-import { CallParticipantResponse, StreamVideoParticipant } from '@stream-io/video-react-sdk';
-import { useEffect, useRef, useState } from 'react';
-import Popup from './Popup';
+import {
+  hasAudio,
+  hasVideo,
+  type StreamVideoParticipant,
+} from '@stream-io/video-react-sdk';
 import Avatar from './Avatar';
-import Mic from './icons/Mic';
-import MicOff from './icons/MicOff';
-import Videocam from './icons/Videocam';
-import VideocamOff from './icons/VideocamOff';
-
-interface PeoplePopupProps {
-  isOpen: boolean;
-  onClose: () => void;
-  participants: Array<CallParticipantResponse | StreamVideoParticipant>;
-  hostId?: string;
-  raisedUserIds?: string[];
-}
-
-const PeoplePopup = ({ isOpen, onClose, participants, hostId, raisedUserIds = [] }: PeoplePopupProps) => {
-  const panelRef = useRef<HTMLDivElement | null>(null);
-  const [entered, setEntered] = useState(false);
-
-  useEffect(() => {
-    if (isOpen) {
-      const id = window.setTimeout(() => setEntered(true), 0);
-      return () => window.clearTimeout(id);
-    } else {
-      setEntered(false);
-    }
-  }, [isOpen]);
-
-  useEffect(() => {
-    const root = document.getElementById('meeting-root');
-    if (!root) return;
-
-    const applyPadding = () => {
-      if (!isOpen || !panelRef.current) {
-        root.style.paddingRight = '';
-        return;
-      }
-      const width = panelRef.current.offsetWidth || 0;
-      root.style.paddingRight = `${width + 16}px`;
-    };
-
-    applyPadding();
-    const onResize = () => applyPadding();
-    window.addEventListener('resize', onResize);
-    return () => {
-      window.removeEventListener('resize', onResize);
-      root.style.paddingRight = '';
-    };
-  }, [isOpen]);
-  return (
-    <Popup
-      ref={panelRef as any}
-      open={isOpen}
-      onClose={onClose}
-      title={<h2>People</h2>}
-      className={
-        `bottom-[5rem] right-4 left-auto h-[calc(100svh-6rem)] ` +
-        `transition-all duration-300 ease-out ` +
-        `${entered ? 'translate-x-0 opacity-100' : 'translate-x-full opacity-0'}`
-      }
-    >
-      <div className="px-4 pb-4 pt-2 h-[calc(100%-66px)] overflow-auto">
-        <ul className="flex flex-col gap-3">
-          {participants.map((p) => {
-            const key = (p as any).user_session_id || (p as any).sessionId || (p as any).userId;
-            const userObj = (p as any).user ?? p;
-            const username = userObj?.custom?.username as string | undefined;
-            const nameFallback = (p as any).name || userObj?.name || userObj?.id || (p as any).userId;
-            const displayName = username || nameFallback;
-            const audioOn =
-              (p as any).audioEnabled ??
-              (p as any).isAudioEnabled ??
-              Boolean((p as any).audioStream?.enabled) ??
-              false;
-            const videoOn =
-              (p as any).videoEnabled ??
-              (p as any).isVideoEnabled ??
-              Boolean((p as any).videoStream?.enabled) ??
-              false;
-            const uid = (p as any).userId || userObj?.id;
-            const isHost = hostId && uid === hostId;
-            const handRaised = uid ? raisedUserIds.includes(uid) : false;
-            const isSpeaking = Boolean((p as any).isSpeaking || (p as any).isDominantSpeaker);
-            return (
-              <li key={key} className="flex items-center gap-3">
-                <Avatar participant={p as any} width={32} />
-                <div className="flex items-center justify-between w-full">
-                  <div className="flex items-center gap-2">
-                    <span className="text-meet-black text-sm font-medium mr-1">{displayName}</span>
-                    <span
-                      className={`inline-block w-2 h-2 rounded-full ${audioOn ? 'bg-emerald-500' : 'bg-gray-400'}`}
-                      title={audioOn ? 'Microphone on' : 'Microphone off'}
-                    />
-                    <span
-                      className={`inline-block w-2 h-2 rounded-full ${videoOn ? 'bg-emerald-500' : 'bg-gray-400'}`}
-                      title={videoOn ? 'Camera on' : 'Camera off'}
-                    />
-                    {isHost && (
-                      <span className="text-[10px] leading-4 px-1.5 py-0.5 rounded bg-meet-blue text-white">Host</span>
-                    )}
-                    {handRaised && (
-                      <span className="text-meet-black/70" title="Hand raised">✋</span>
-                    )}
-                    {isSpeaking && (
-                      <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse" title="Speaking" />
-                    )}
-                  </div>
-                </div>
-              </li>
-            );
-          })}
-          {participants.length === 0 && (
-            <li className="text-meet-black/70 text-sm">No one else is here</li>
-          )}
-        </ul>
-      </div>
-    </Popup>
+import type { JoinRequest } from '@/lib/meeting';
+export default function PeoplePopup({
+  participants,
+  hostId,
+  meId,
+  raisedUserIds,
+  requests,
+  isHost,
+  onAdmit,
+  onDeny,
+  onMute,
+  onRemove,
+  busy,
+}: {
+  participants: StreamVideoParticipant[];
+  hostId: string;
+  meId: string;
+  raisedUserIds: string[];
+  requests: JoinRequest[];
+  isHost: boolean;
+  onAdmit: (id: string) => void;
+  onDeny: (id: string) => void;
+  onMute: (id: string) => void;
+  onRemove: (id: string) => void;
+  busy: boolean;
+}) {
+  const ordered = [...participants].sort((a, b) =>
+    a.userId === hostId
+      ? -1
+      : b.userId === hostId
+        ? 1
+        : (a.name || a.userId).localeCompare(b.name || b.userId),
   );
-};
-
-export default PeoplePopup;
+  return (
+    <div className="p-5 overflow-y-auto space-y-6">
+      {isHost && requests.length > 0 && (
+        <section>
+          <h3 className="text-sm font-medium mb-3">
+            Waiting to join ({requests.length})
+          </h3>
+          {requests.map((request) => (
+            <div key={request.id} className="rounded-xl bg-blue-50 p-3 mb-2">
+              <p className="font-medium text-sm">{request.name}</p>
+              <div className="mt-2 flex gap-4 text-sm">
+                <button
+                  disabled={busy}
+                  className="text-primary"
+                  onClick={() => onAdmit(request.id)}
+                >
+                  Admit
+                </button>
+                <button
+                  disabled={busy}
+                  className="text-meet-red"
+                  onClick={() => onDeny(request.id)}
+                >
+                  Deny
+                </button>
+              </div>
+            </div>
+          ))}
+        </section>
+      )}
+      <section>
+        <h3 className="text-sm font-medium mb-4">
+          In the meeting ({participants.length})
+        </h3>
+        <ul className="space-y-5">
+          {ordered.map((participant) => (
+            <li key={participant.sessionId}>
+              <div className="flex gap-3 items-center">
+                <Avatar participant={participant} width={36} />
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-medium truncate">
+                    {participant.name || participant.userId}
+                    {participant.userId === meId ? ' (You)' : ''}
+                  </p>
+                  <p className="text-xs text-meet-gray mt-1">
+                    {participant.userId === hostId ? 'Host · ' : ''}
+                    {hasAudio(participant) ? 'Mic on' : 'Mic off'} ·{' '}
+                    {hasVideo(participant) ? 'Camera on' : 'Camera off'}
+                  </p>
+                </div>
+                {raisedUserIds.includes(participant.userId) && (
+                  <span aria-label="Hand raised">✋</span>
+                )}
+                {participant.isSpeaking && (
+                  <span className="text-xs text-primary">Speaking</span>
+                )}
+              </div>
+              {isHost && participant.userId !== meId && (
+                <div className="ml-12 mt-2 text-xs flex gap-4">
+                  <button
+                    disabled={busy || !hasAudio(participant)}
+                    onClick={() => onMute(participant.userId)}
+                    className="text-primary"
+                  >
+                    Mute
+                  </button>
+                  <button
+                    disabled={busy}
+                    onClick={() => onRemove(participant.userId)}
+                    className="text-meet-red"
+                  >
+                    Remove
+                  </button>
+                </div>
+              )}
+            </li>
+          ))}
+        </ul>
+      </section>
+    </div>
+  );
+}

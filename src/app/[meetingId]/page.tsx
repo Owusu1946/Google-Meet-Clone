@@ -1,225 +1,209 @@
 'use client';
-import { useContext, useEffect, useMemo, useState } from 'react';
-import { useRouter } from 'next/navigation';
-import {
-  CallingState,
-  CallParticipantResponse,
-  ErrorFromResponse,
-  GetCallResponse,
-  useCall,
-  useCallStateHooks,
-  useConnectedUser,
-} from '@stream-io/video-react-sdk';
-import { useChatContext } from 'stream-chat-react';
+import Link from 'next/link';
+import { useCallback, useEffect, useState } from 'react';
+import { useParams, useRouter } from 'next/navigation';
 import { useUser } from '@clerk/nextjs';
-
-import { AppContext, MEETING_ID_REGEX } from '@/contexts/AppProvider';
-import { GUEST_ID, tokenProvider } from '@/contexts/MeetProvider';
-import Button from '@/components/Button';
-import CallParticipants from '@/components/CallParticipants';
 import Header from '@/components/Header';
 import MeetingPreview from '@/components/MeetingPreview';
-import Spinner from '@/components/Spinner';
-import TextField from '@/components/TextField';
+import {
+  api,
+  errorMessage,
+  MEETING_ID_REGEX,
+  type MeetingAccess,
+} from '@/lib/meeting';
 
-interface LobbyProps {
-  params: {
-    meetingId: string;
-  };
-}
-
-const Lobby = ({ params }: LobbyProps) => {
-  const { meetingId } = params;
-  const validMeetingId = MEETING_ID_REGEX.test(meetingId);
-  const { newMeeting, setNewMeeting } = useContext(AppContext);
-  const { client: chatClient } = useChatContext();
-  const { isSignedIn } = useUser();
+export default function Lobby() {
+  const { meetingId } = useParams<{ meetingId: string }>();
   const router = useRouter();
-  const connectedUser = useConnectedUser();
-  const call = useCall();
-  const { useCallCallingState } = useCallStateHooks();
-  const callingState = useCallCallingState();
-  const [guestName, setGuestName] = useState('');
-  const [errorFetchingMeeting, setErrorFetchingMeeting] = useState(false);
-  const [loading, setLoading] = useState(true);
-  const [joining, setJoining] = useState(false);
-  const [participants, setParticipants] = useState<CallParticipantResponse[]>(
-    []
-  );
-  const isGuest = !isSignedIn;
-
-  useEffect(() => {
-    const leavePreviousCall = async () => {
-      if (callingState === CallingState.JOINED) {
-        await call?.leave();
-      }
-    };
-
-    const getCurrentCall = async () => {
-      try {
-        const callData = await call?.get();
-        setParticipants(callData?.call?.session?.participants || []);
-      } catch (e) {
-        const err = e as ErrorFromResponse<GetCallResponse>;
-        console.error(err.message);
-        if (err.status === 404) {
-          setErrorFetchingMeeting(true);
-        }
-        // For 401/403 and other non-404 errors, proceed without participants
-      }
-      setLoading(false);
-    };
-
-    const createCall = async () => {
-      await call?.create({
-        data: {
-          members: [
-            {
-              user_id: connectedUser?.id!,
-              role: 'host',
-            },
-          ],
-        },
-      });
-      setLoading(false);
-    };
-
-    if (!joining && validMeetingId) {
-      leavePreviousCall();
-      if (!connectedUser) return;
-      if (newMeeting) {
-        createCall();
-      } else {
-        getCurrentCall();
-      }
-    }
-  }, [call, callingState, connectedUser, joining, newMeeting, validMeetingId]);
-
-  useEffect(() => {
-    setNewMeeting(newMeeting);
-
-    return () => {
-      setNewMeeting(false);
-    };
-  }, [newMeeting, setNewMeeting]);
-
-  const heading = useMemo(() => {
-    if (loading) return 'Getting ready...';
-    return isGuest ? "What's your name?" : 'Ready to join?';
-  }, [loading, isGuest]);
-
-  const participantsUI = useMemo(() => {
-    switch (true) {
-      case loading:
-        return "You'll be able to join in just a moment";
-      case joining:
-        return "You'll join the call in just a moment";
-      case participants.length === 0:
-        return 'No one else is here';
-      case participants.length > 0:
-        return <CallParticipants participants={participants} />;
-      default:
-        return null;
-    }
-  }, [loading, joining, participants]);
-
-  const updateGuestName = async () => {
-    try {
-      await fetch('/api/user', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          user: { id: connectedUser?.id, name: guestName },
-        }),
-      });
-      await chatClient.disconnectUser();
-      await chatClient.connectUser(
-        {
-          id: GUEST_ID,
-          type: 'guest',
-          name: guestName,
-        },
-        tokenProvider
+  const { isLoaded, isSignedIn } = useUser();
+  const [access, setAccess] = useState<MeetingAccess>();
+  const [name, setName] = useState('');
+  const [error, setError] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [attempt, setAttempt] = useState(0);
+  const valid = MEETING_ID_REGEX.test(meetingId);
+  const refresh = useCallback(
+    async (signal?: AbortSignal) => {
+      const next = await api<MeetingAccess>(
+        `/api/meetings/${meetingId}/access`,
+        { method: 'POST', body: '{}', signal },
       );
-    } catch (error) {
-      console.error(error);
+      if (signal?.aborted) return next;
+      setError('');
+      setAccess(next);
+      setName((current) => current || next.identity.name);
+      return next;
+    },
+    [meetingId],
+  );
+  useEffect(() => {
+    if (!isLoaded || !valid) return;
+    setAccess(undefined);
+    const controller = new AbortController();
+    setError('');
+    void refresh(controller.signal).catch((failure) => {
+      if (!controller.signal.aborted) setError(errorMessage(failure));
+    });
+    return () => controller.abort();
+  }, [isLoaded, isSignedIn, valid, refresh, attempt]);
+  useEffect(() => {
+    if (access?.status !== 'waiting') return;
+    let cancelled = false;
+    const controller = new AbortController();
+    let timer: ReturnType<typeof setTimeout>;
+    const poll = async () => {
+      try {
+        const next = await refresh(controller.signal);
+        if (!cancelled && next.status === 'ready') {
+          router.replace(`/${meetingId}/meeting`);
+          return;
+        }
+      } catch (failure) {
+        if (!cancelled) setError(errorMessage(failure));
+      }
+      if (!cancelled) timer = setTimeout(poll, 3000);
+    };
+    timer = setTimeout(poll, 3000);
+    return () => {
+      cancelled = true;
+      controller.abort();
+      clearTimeout(timer);
+    };
+  }, [access?.status, refresh, meetingId, router]);
+  const join = async () => {
+    if (busy) return;
+    setBusy(true);
+    setError('');
+    try {
+      const next = await api<MeetingAccess>(
+        `/api/meetings/${meetingId}/access`,
+        {
+          method: 'POST',
+          body: JSON.stringify({
+            ask: true,
+            ...(!isSignedIn ? { name: name.trim() } : {}),
+          }),
+        },
+      );
+      setAccess(next);
+      if (next.status === 'ready') router.push(`/${meetingId}/meeting`);
+      else setBusy(false);
+    } catch (failure) {
+      setError(errorMessage(failure));
+      setBusy(false);
     }
   };
-
-  const joinCall = async () => {
-    setJoining(true);
-    if (isGuest) {
-      await updateGuestName();
-    }
-    if (callingState !== CallingState.JOINED) {
-      await call?.join();
-    }
-    router.push(`/${meetingId}/meeting`);
-  };
-
-  if (!validMeetingId)
+  if (!valid)
     return (
-      <div>
+      <>
         <Header />
-        <div className="w-full h-full flex flex-col items-center justify-center mt-[6.75rem]">
-          <h1 className="text-4xl leading-[2.75rem] font-normal text-dark-gray tracking-normal mb-12">
-            Invalid video call name.
-          </h1>
-          <Button size="sm" onClick={() => router.push('/')}>
-            Return to home screen
-          </Button>
-        </div>
-      </div>
+        <main className="text-center py-24">
+          <h1 className="text-3xl">Invalid meeting code</h1>
+          <Link href="/" className="text-primary block mt-6">
+            Return home
+          </Link>
+        </main>
+      </>
     );
-
-  if (errorFetchingMeeting) {
-    router.push(`/${meetingId}/meeting-end?invalid=true`);
-  }
-
+  const unavailable =
+    access && ['denied', 'locked', 'ended'].includes(access.status);
   return (
     <div>
       <Header navItems={false} />
-      <main className="lg:h-[calc(100svh-80px)] p-4 mt-3 flex flex-col lg:flex-row items-center justify-center gap-8 lg:gap-0">
+      <main className="mx-auto max-w-6xl px-5 py-10 lg:py-16 grid gap-12 lg:grid-cols-[1.5fr_1fr] items-center">
         <MeetingPreview />
-        <div className="flex flex-col items-center lg:justify-center gap-4 grow-0 shrink-0 basis-112 h-135 mr-2 lg:mb-13">
-          <h2 className="text-black text-3xl text-center truncate">
-            {heading}
-          </h2>
-          {isGuest && !loading && (
-            <TextField
-              label="Name"
-              name="name"
-              placeholder="Your name"
-              value={guestName}
-              onChange={(e) => setGuestName(e.target.value)}
-            />
+        <section className="text-center space-y-5">
+          <h1 className="text-3xl">
+            {access?.status === 'waiting'
+              ? 'Asking to join…'
+              : access?.status === 'ended'
+                ? 'This meeting has ended'
+                : access?.status === 'locked'
+                  ? 'This meeting is locked'
+                  : access?.status === 'denied'
+                    ? 'You can’t join this meeting'
+                    : access
+                      ? 'Ready to join?'
+                      : 'Getting ready…'}
+          </h1>
+          {access && (
+            <p className="text-meet-gray">
+              {meetingId}
+              <br />
+              Hosted by {access.hostName}
+            </p>
           )}
-          <span className="text-meet-black font-medium text-center text-sm cursor-default">
-            {participantsUI}
-          </span>
-          <div>
-            {!joining && !loading && (
-              <Button
-                className="w-60 text-sm"
-                onClick={joinCall}
-                disabled={isGuest && !guestName}
-                rounding="lg"
+          {access?.status === 'waiting' ? (
+            <p>
+              The host will let you in soon. You can keep adjusting your camera
+              and microphone.
+            </p>
+          ) : (
+            !unavailable &&
+            access && (
+              <>
+                {!isSignedIn && (
+                  <input
+                    maxLength={80}
+                    className="border border-border-gray rounded-lg px-4 py-3 w-full max-w-xs"
+                    aria-label="Your name"
+                    placeholder="Your name"
+                    value={name}
+                    onChange={(event) => setName(event.target.value)}
+                  />
+                )}
+                <p className="text-sm text-meet-gray">
+                  {access.participantCount
+                    ? `${access.participantCount} people are in the meeting`
+                    : 'No one else is here'}
+                </p>
+                <button
+                  onClick={() => void join()}
+                  disabled={busy || (!isSignedIn && !name.trim())}
+                  className="primary-button"
+                >
+                  {busy
+                    ? 'Joining…'
+                    : access.status === 'ready' || access.access === 'open'
+                      ? 'Join now'
+                      : 'Ask to join'}
+                </button>
+              </>
+            )
+          )}
+          {access?.status === 'denied' && (
+            <p>
+              The host declined your request or removed you. Contact them for
+              help.
+            </p>
+          )}
+          {access?.status === 'locked' && (
+            <>
+              <p>The host is not accepting new participants.</p>
+              <button
+                className="text-primary"
+                onClick={() => setAttempt((value) => value + 1)}
               >
-                Join now
-              </Button>
-            )}
-            {(joining || loading) && (
-              <div className="h-14 pb-2.5">
-                <Spinner />
-              </div>
-            )}
-          </div>
-        </div>
+                Check again
+              </button>
+            </>
+          )}
+          {error && (
+            <div role="alert">
+              <p className="text-meet-red">{error}</p>
+              <button
+                className="mt-3 text-primary"
+                onClick={() => setAttempt((value) => value + 1)}
+              >
+                Try again
+              </button>
+            </div>
+          )}
+          <Link href="/" className="block text-primary text-sm">
+            Return home
+          </Link>
+        </section>
       </main>
     </div>
   );
-};
-
-export default Lobby;
+}
