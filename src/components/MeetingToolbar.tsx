@@ -1,14 +1,12 @@
+import { useEffect, useRef } from 'react';
+import useMeetingActions from '@/hooks/useMeetingActions';
 import { useRoom } from '@/contexts/MeetingRoomContext';
-import { api } from '@/lib/meeting';
 import useTime from '@/hooks/useTime';
 import CallControlButton from './CallControlButton';
 import Mic from './icons/Mic';
 import MicOff from './icons/MicOff';
 import Videocam from './icons/Videocam';
 import VideocamOff from './icons/VideocamOff';
-import BackHand from './icons/BackHand';
-import ClosedCaptions from './icons/ClosedCaptions';
-import PresentToAll from './icons/PresentToAll';
 import MoreVert from './icons/MoreVert';
 import CallEndFilled from './icons/CallEndFilled';
 import Group from './icons/Group';
@@ -21,16 +19,9 @@ export default function MeetingToolbar() {
     participants,
     mic,
     camera,
-    share,
-    canShare,
     busy,
-    local,
-    raised,
-    run,
     toggleMic,
     toggleCamera,
-    showCaptions,
-    toggleCaptions,
     setMenu,
     setLeavePrompt,
     leave,
@@ -39,14 +30,37 @@ export default function MeetingToolbar() {
     unread,
   } = room;
   const { currentTime } = useTime();
+  const actions = useMeetingActions();
+  const toolbar = useRef<HTMLElement>(null);
+  const { toolbarActionCount, setToolbarActionCount } = room;
+  useEffect(() => {
+    const element = toolbar.current;
+    if (!element) return;
+    const observer = new ResizeObserver(([entry]) => {
+      const width = entry.contentRect.width;
+      // Reserve core controls, People/Chat, gaps and meeting metadata before extras.
+      setToolbarActionCount(
+        width < 768
+          ? 0
+          : Math.max(
+              0,
+              Math.floor((width - 312 - (width >= 1280 ? 240 : 0)) / 48),
+            ),
+      );
+    });
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, [setToolbarActionCount]);
+  const visible = actions.slice(0, toolbarActionCount);
+  const overflow = actions.length > toolbarActionCount;
   return (
-    <footer className="meeting-toolbar">
-      <div className="hidden lg:flex items-center gap-3 text-sm min-w-0">
+    <footer ref={toolbar} className="meeting-toolbar">
+      <div className="meeting-toolbar-info items-center gap-3 text-sm min-w-0">
         <span>{currentTime}</span>
         <span>·</span>
         <span className="truncate">{access.meetingId}</span>
       </div>
-      <div className="flex items-center justify-center gap-2">
+      <div className="flex items-center justify-center gap-2 shrink-0">
         <CallControlButton
           title={
             mic.optimisticIsMute ? 'Turn on microphone' : 'Turn off microphone'
@@ -65,45 +79,16 @@ export default function MeetingToolbar() {
           active={camera.optimisticIsMute}
           className={camera.optimisticIsMute ? 'toggle-button-alert' : ''}
         />
-        <CallControlButton
-          title={raised ? 'Lower hand' : 'Raise hand'}
-          icon={<BackHand />}
-          active={raised}
-          disabled={busy || !local}
-          className="hidden min-[400px]:inline-flex"
-          onClick={() =>
-            void run(() =>
-              api(`/api/meetings/${access.meetingId}/state`, {
-                method: 'POST',
-                body: JSON.stringify({
-                  raised: !raised,
-                  sessionId: local?.sessionId,
-                }),
-              }),
-            )
-          }
-        />
-        <CallControlButton
-          title={showCaptions ? 'Hide captions' : 'Show captions'}
-          icon={<ClosedCaptions />}
-          active={showCaptions}
-          disabled={busy}
-          onClick={() => void toggleCaptions()}
-          className="hidden sm:inline-flex"
-        />
-        <CallControlButton
-          title={share.optimisticIsMute ? 'Present now' : 'Stop presenting'}
-          icon={<PresentToAll />}
-          active={!share.optimisticIsMute}
-          disabled={busy || !canShare}
-          onClick={() => void run(() => share.screenShare.toggle())}
-          className="hidden sm:inline-flex"
-        />
-        <CallControlButton
-          title="More options"
-          icon={<MoreVert />}
-          onClick={() => setMenu(true)}
-        />
+        {visible.map((action) => (
+          <CallControlButton key={action.id} {...action} />
+        ))}
+        {overflow && (
+          <CallControlButton
+            title="More options"
+            icon={<MoreVert />}
+            onClick={() => setMenu(true)}
+          />
+        )}
         <CallControlButton
           title="Leave meeting"
           icon={<CallEndFilled />}

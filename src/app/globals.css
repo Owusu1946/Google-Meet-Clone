@@ -57,6 +57,7 @@
   overflow: hidden;
 }
 .meeting-toolbar {
+  container-type: inline-size;
   min-height: 80px;
   padding: 12px 16px max(12px, env(safe-area-inset-bottom));
   display: flex;
@@ -527,4 +528,18 @@ input:focus-visible {
   .animate-scale-in {
     animation: scaleIn 0.25s ease-out;
   }
+}
+
+.meeting-toolbar-info {
+  display: none;
+  width: 220px;
+  flex-shrink: 0;
+}
+@container (min-width: 1280px) {
+  .meeting-toolbar-info {
+    display: flex;
+  }
+}
+.meeting-toolbar .call-control-button {
+  flex-shrink: 0;
 }

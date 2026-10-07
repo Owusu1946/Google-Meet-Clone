@@ -39,7 +39,7 @@ The meeting has tiled and active-speaker layouts, screen sharing, one side panel
 
 The board sends a first-point preview immediately and additional segments every 80ms while drawing, independently of server persistence. A bounded live queue batches preview events on slow networks; unsaved remote previews expire after 30 seconds. Durable saves batch up to 16 operations and 4KB per request, retain canonical ordering, and acknowledge exact IDs for safe retries. Delivery latency depends on network and service conditions. The board uses world coordinates, pointer capture, bounded stroke segments, server-validated writes, persistent history, deterministic replay, own-stroke undo/redo, host-only clear, and whole-board PNG export. Failed edits remain queued, can be retried, and survive reload in the same tab. Normal leaving waits for pending edits. Each viewer can open/close the board; host presentation announces and opens it for others and late joiners.
 
-Keyboard shortcuts: Ctrl/Command+D toggles the microphone; Ctrl/Command+E toggles the camera. Escape closes dialogs or the focused side panel. The More options menu keeps collaboration features available on phones.
+Keyboard shortcuts: Ctrl/Command+D toggles the microphone; Ctrl/Command+E toggles the camera. Escape closes dialogs or the focused side panel. The bottom toolbar exposes meeting actions as space permits. Board, reactions, settings, layout, invitations, and host actions move into More options when space runs out; phones keep the core controls and use More for extras.
 
 ## Validation
 
