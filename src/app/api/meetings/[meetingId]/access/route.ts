@@ -1,6 +1,6 @@
 import { identity } from '@/lib/server/identity';
 import { assertSameOrigin, failure, HttpError, json, readBody } from '@/lib/server/http';
-import { addMember, meetingCall, requestChannel, stream, syncIdentity } from '@/lib/server/stream';
+import { addMember, chatServer, meetingCall, requestChannel, stream, syncIdentity } from '@/lib/server/stream';
 import { AccessStatus } from '@/lib/meeting';
 
 type Context = { params: Promise<{ meetingId: string }> };
@@ -24,7 +24,7 @@ async function access(meetingId: string, ask: boolean, name?: string) {
       await syncIdentity(user);
       if (policy === 'open') { await addMember(meetingId, user.id); status = 'ready'; }
       else {
-        const result = await channel.create({ created_by_id: data.created_by.id, members: [data.created_by.id], meeting_id: meetingId, applicant_id: user.id, applicant_name: user.name, status: 'waiting', requested_at: new Date().toISOString() });
+        const result = await chatServer().channel('meet-requests', channel.id!, { created_by_id: data.created_by.id, members: [data.created_by.id], meeting_id: meetingId, applicant_id: user.id, applicant_name: user.name, status: 'waiting', requested_at: new Date().toISOString() }).create();
         status = result.channel?.status === 'denied' ? 'denied' : 'waiting';
       }
     } else {

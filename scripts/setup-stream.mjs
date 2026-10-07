@@ -1,24 +1,29 @@
 import { StreamClient } from '@stream-io/node-sdk';
 import { StreamChat } from 'stream-chat';
 
+// SDK errors can contain HTTP authorization headers. Never dump request objects.
+process.on('uncaughtException', error => { console.error(`Stream setup failed: ${error.message.slice(0, 250)}`); process.exitCode = 1; });
+
 const key = process.env.NEXT_PUBLIC_STREAM_API_KEY;
 const secret = process.env.STREAM_API_SECRET;
 if (!key || !secret) throw new Error('Configure Stream credentials in .env first.');
 const video = new StreamClient(key, secret, { timeout: 30_000 }).video;
-const chat = new StreamChat(key, secret);
+const chat = new StreamChat(key, secret, { timeout: 30_000 });
+const defaults = (await video.getCallType({ name: 'default' })).settings;
 const member = ['read-call', 'join-call', 'send-audio', 'send-video', 'screenshare', 'send-event', 'create-call-reaction'];
 const host = [...member, 'mute-users', 'block-user', 'kick-user', 'end-call', 'pin-call-track', 'list-recordings', 'start-recording', 'stop-recording', 'start-closed-captions', 'stop-closed-captions'];
 const videoConfig = {
   grants: { user: [], guest: [], call_member: member, host },
   settings: {
-    audio: { mic_default_on: false, default_device: 'speaker' },
-    video: { camera_default_on: false },
+    ...defaults,
+    audio: { ...defaults.audio, mic_default_on: false, default_device: 'speaker' },
+    video: { ...defaults.video, camera_default_on: false },
     recording: { mode: 'available', quality: '720p' },
     transcription: { mode: 'available', closed_caption_mode: 'available', language: 'en' },
   },
 };
 const existing = await video.listCallTypes();
-if (!existing.call_types.some(type => type.name === 'meet')) {
+if (!Object.hasOwn(existing.call_types, 'meet')) {
   await video.createCallType({ name: 'meet', ...videoConfig });
 }
 await video.updateCallType({ name: 'meet', ...videoConfig });

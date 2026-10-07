@@ -14,7 +14,7 @@ export function stream() {
 }
 export function chatServer() {
   stream();
-  return chatSingleton ||= new StreamChat(process.env.NEXT_PUBLIC_STREAM_API_KEY!, process.env.STREAM_API_SECRET!);
+  return chatSingleton ||= new StreamChat(process.env.NEXT_PUBLIC_STREAM_API_KEY!, process.env.STREAM_API_SECRET!, { timeout: 10_000, disableCache: true });
 }
 export function meetingCall(id: string) {
   if (!MEETING_ID_REGEX.test(id)) throw new HttpError(400, 'Invalid meeting code.');

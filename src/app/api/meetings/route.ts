@@ -18,7 +18,7 @@ export async function POST(request: Request) {
       created_by_id: user.id, members: [{ user_id: user.id, role: 'host' }],
       custom: { access, locked: false, collaboration: true },
     } });
-    for (const type of [CHAT_TYPE, BOARD_TYPE]) await chatServer().channel(type, meetingId).create({ created_by_id: user.id, members: [user.id] });
+    for (const type of [CHAT_TYPE, BOARD_TYPE]) await chatServer().channel(type, meetingId, { created_by_id: user.id, members: [user.id] }).create();
     return json({ meetingId });
   } catch (error) { return failure(error); }
 }

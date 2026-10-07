@@ -3,7 +3,7 @@ import clsx from 'clsx';
 
 interface ButtonWithIconProps {
   children: ReactNode;
-  icon: JSX.Element;
+  icon: React.ReactNode;
   onClick?: () => void;
   rounding?: 'sm' | 'md' | 'lg';
   size?: 'sm' | 'md';

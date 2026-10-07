@@ -1,253 +1,57 @@
-'use client';
-import { useContext, useEffect, useState } from 'react';
+"use client";
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { SignInButton, useUser } from '@clerk/nextjs';
-import { customAlphabet } from 'nanoid';
-import {
-  ErrorFromResponse,
-  GetCallResponse,
-  StreamVideoClient,
-  User,
-} from '@stream-io/video-react-sdk';
-import Image from 'next/image';
-import clsx from 'clsx';
-
-import { API_KEY, CALL_TYPE, tokenProvider } from '@/contexts/MeetProvider';
-import { AppContext, MEETING_ID_REGEX } from '@/contexts/AppProvider';
-import Button from '@/components/Button';
-import ButtonWithIcon from '@/components/ButtonWithIcon';
 import Header from '@/components/Header';
-import KeyboardFilled from '@/components/icons/KeyboardFilled';
-import PlainButton from '@/components/PlainButton';
-import TextField from '@/components/TextField';
-import Videocall from '@/components/icons/Videocall';
 import NewMeetingDropdown from '@/components/NewMeetingDropdown';
 import MeetingLinkPopup from '@/components/MeetingLinkPopup';
-import Link from '@/components/icons/Link';
+import { api, errorMessage, parseMeetingCode } from '@/lib/meeting';
+import Videocall from '@/components/icons/Videocall';
+import LinkIcon from '@/components/icons/Link';
 import Add from '@/components/icons/Add';
 
-const generateMeetingId = () => {
-  const alphabet = 'abcdefghijklmnopqrstuvwxyz';
-  const nanoid = customAlphabet(alphabet, 4);
-
-  return `${nanoid(3)}-${nanoid(4)}-${nanoid(3)}`;
-};
-
-const GUEST_USER: User = { id: 'guest', type: 'guest' };
-
-const Home = () => {
-  const { setNewMeeting } = useContext(AppContext);
-  const { isLoaded, isSignedIn, user } = useUser();
-  const [code, setCode] = useState('');
-  const [checkingCode, setCheckingCode] = useState(false);
-  const [error, setError] = useState('');
-  const [showDropdown, setShowDropdown] = useState(false);
-  const [showLinkPopup, setShowLinkPopup] = useState(false);
-  const [generatedMeetingId, setGeneratedMeetingId] = useState('');
+type RecentMeeting = { id: string; host: string; createdAt: string; ended: boolean; isHost: boolean };
+export default function Home() {
   const router = useRouter();
-
+  const { isLoaded, isSignedIn } = useUser();
+  const [code, setCode] = useState('');
+  const [error, setError] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [menu, setMenu] = useState(false);
+  const [link, setLink] = useState('');
+  const [recent, setRecent] = useState<RecentMeeting[]>([]);
   useEffect(() => {
-    let timeout: NodeJS.Timeout;
-    if (error) {
-      timeout = setTimeout(() => {
-        setError('');
-      }, 3000);
-    }
-    return () => {
-      clearTimeout(timeout);
-    };
-  }, [error]);
-
-  const handleNewMeeting = () => {
-    setShowDropdown(!showDropdown);
-  };
-
-  const handleCreateMeetingForLater = async () => {
-    if (!user) return;
-    const meetingId = generateMeetingId();
-    let client: StreamVideoClient | undefined;
-
+    if (!isLoaded) return;
+    const abort = new AbortController();
+    void api<{ meetings: RecentMeeting[] }>('/api/meetings', { signal: abort.signal }).then(data => setRecent(data.meetings)).catch(() => undefined);
+    return () => abort.abort();
+  }, [isLoaded, isSignedIn]);
+  const create = async (later: boolean) => {
+    if (busy) return;
+    setBusy(true); setError('');
     try {
-      const meetingUser: User = {
-        id: user.id,
-        name: user.fullName || undefined,
-        image: user.hasImage ? user.imageUrl : undefined,
-        custom: {
-          username: user.username || undefined,
-        },
-      };
-
-      client = new StreamVideoClient({
-        apiKey: API_KEY,
-        user: meetingUser,
-        tokenProvider: () => tokenProvider(user.id),
-      });
-
-      const call = client.call(CALL_TYPE, meetingId);
-      await call.create({
-        data: {
-          members: [
-            {
-              user_id: user.id,
-              role: 'host',
-            },
-          ],
-        },
-      });
-
-      setGeneratedMeetingId(meetingId);
-      setShowLinkPopup(true);
-    } catch (err) {
-      console.error(err);
-      setError('Unable to reserve meeting link. Try again.');
-    } finally {
-      await client?.disconnectUser();
-    }
+      const { meetingId } = await api<{ meetingId: string }>('/api/meetings', { method: 'POST', body: '{}' });
+      if (later) { setLink(meetingId); setBusy(false); }
+      else router.push(`/${meetingId}`);
+    } catch (failure) { setError(errorMessage(failure)); setBusy(false); }
   };
-
-  const handleStartInstantMeeting = () => {
-    setNewMeeting(true);
-    router.push(`/${generateMeetingId()}`);
+  const join = (event: React.FormEvent) => {
+    event.preventDefault();
+    const id = parseMeetingCode(code);
+    if (!id) { setError('Enter a meeting code such as abc-defg-hij, or paste a meeting link.'); return; }
+    router.push(`/${id}`);
   };
-
-  const handleCode = async () => {
-    if (!MEETING_ID_REGEX.test(code)) return;
-    setCheckingCode(true);
-
-    const client = new StreamVideoClient({
-      apiKey: API_KEY,
-      user: GUEST_USER,
-    });
-    const call = client.call(CALL_TYPE, code);
-
-    try {
-      const response: GetCallResponse = await call.get();
-      if (response.call) {
-        router.push(`/${code}`);
-        return;
-      }
-    } catch (e: unknown) {
-      let err = e as ErrorFromResponse<GetCallResponse>;
-      console.error(err.message);
-      if (err.status === 404) {
-        setError("Couldn't find the meeting you're trying to join.");
-      }
-    }
-
-    setCheckingCode(false);
-  };
-
-  return (
-    <div>
-      <Header />
-      <main
-        className={clsx(
-          'flex flex-col items-center justify-center px-6',
-          isLoaded ? 'animate-fade-in' : 'opacity-0'
-        )}
-      >
-        <div className="w-full max-w-2xl p-4 pt-7 text-center inline-flex flex-col items-center basis-auto shrink-0">
-          <h1 className="text-5xl tracking-normal text-black pb-2">
-            Video calls and meetings for everyone
-          </h1>
-          <p className="text-1x text-gray pb-8">
-            Connect, collaborate, and celebrate from anywhere with Google Meet Clone
-          </p>
-        </div>
-        <div className="w-full max-w-xl flex justify-center">
-          <div className="flex flex-col items-start sm:flex-row gap-6 sm:gap-2 sm:items-center justify-center">
-            {isSignedIn && (
-              <div className="relative">
-                <ButtonWithIcon onClick={handleNewMeeting} icon={<Videocall />}>
-                  New meeting
-                </ButtonWithIcon>
-                <NewMeetingDropdown
-                  isOpen={showDropdown}
-                  onClose={() => setShowDropdown(false)}
-                  options={[
-                    {
-                      icon: <Link />,
-                      label: 'Create a meeting for later',
-                      onClick: handleCreateMeetingForLater,
-                    },
-                    {
-                      icon: <Add />,
-                      label: 'Start an instant meeting',
-                      onClick: handleStartInstantMeeting,
-                    },
-                  ]}
-                />
-              </div>
-            )}
-            {!isSignedIn && (
-              <SignInButton>
-                <Button size="md">Sign in</Button>
-              </SignInButton>
-            )}
-            <div className="flex items-center gap-2 sm:ml-4">
-              <TextField
-                label="Code or link"
-                name="code"
-                placeholder="Enter a code or link"
-                value={code}
-                onChange={(e) => setCode(e.target.value)}
-                icon={<KeyboardFilled />}
-              />
-              <PlainButton onClick={handleCode} disabled={!code}>
-                Join
-              </PlainButton>
-            </div>
-          </div>
-        </div>
-        <div className="w-full max-w-xl mx-auto border-b border-b-border-gray self-stretch mt-8 mb-20" />
-        <div className="flex flex-col items-center justify-center gap-8">
-          <Image
-            src="https://www.gstatic.com/meet/user_edu_get_a_link_light_90698cd7b4ca04d3005c962a3756c42d.svg"
-            alt="Get a link you can share"
-            width={248}
-            height={248}
-          />
-          <div className="flex flex-col gap-2 text-center max-w-sm">
-            <h2 className="text-2xl tracking-normal text-black">
-              Get a link you can share
-            </h2>
-            <p className="font-roboto text-sm text-black pb-8 grow">
-              Click <span className="font-bold">New meeting</span> to get a link
-              you can send to people you want to meet with
-            </p>
-          </div>
-        </div>
-        {checkingCode && (
-          <div className="z-50 fixed top-0 left-0 w-full h-full flex items-center justify-center text-white text-3xl bg-[#000] animate-transition-overlay-fade-in">
-            Joining...
-          </div>
-        )}
-        {error && (
-          <div className="z-50 fixed bottom-0 left-0 pointer-events-none m-6 flex items-center justify-start">
-            <div className="rounded p-4 font-roboto text-white text-sm bg-dark-gray shadow-[0_3px_5px_-1px_rgba(0,0,0,.2),0_6px_10px_0_rgba(0,0,0,.14),0_1px_18px_0_rgba(0,0,0,.12)]">
-              {error}
-            </div>
-          </div>
-        )}
-        <MeetingLinkPopup
-          isOpen={showLinkPopup}
-          onClose={() => setShowLinkPopup(false)}
-          meetingId={generatedMeetingId}
-          baseUrl={typeof window !== 'undefined' ? window.location.origin : ''}
-        />
-        <footer className="w-full max-w-xl mt-20 pb-4 text-start">
-          <div className="text-xs text-gray tracking-wider">
-            <span className="cursor-pointer">
-              <a className="text-meet-blue hover:underline" href="#">
-                Learn more
-              </a>{' '}
-              about Google Meet Clone
-            </span>
-          </div>
-        </footer>
-      </main>
+  return <div><Header /><main className="mx-auto max-w-6xl px-6 py-12 sm:py-20">
+    <div className="grid items-center gap-16 lg:grid-cols-2">
+      <section><h1 className="text-4xl sm:text-5xl leading-tight text-meet-black">Video calls and meetings for everyone</h1><p className="mt-6 text-lg text-meet-gray max-w-md">Connect with your team. Share ideas, draw together, and follow every speaker with live captions.</p>
+        <div className="mt-8 flex flex-wrap gap-5 items-center">
+          {isSignedIn ? <div className="relative"><button disabled={busy} onClick={() => setMenu(value => !value)} className="primary-button flex items-center gap-2"><Videocall />{busy ? 'Creating…' : 'New meeting'}</button><NewMeetingDropdown isOpen={menu} onClose={() => setMenu(false)} options={[{ icon: <LinkIcon />, label: 'Create a meeting for later', onClick: () => void create(true) }, { icon: <Add />, label: 'Start an instant meeting', onClick: () => void create(false) }]} /></div> : <SignInButton mode="modal"><button className="primary-button">Sign in to create a meeting</button></SignInButton>}
+          <form onSubmit={join} className="flex gap-2"><input className="rounded-lg border border-border-gray px-4 py-3 w-52" aria-label="Meeting code or link" placeholder="Enter a code or link" value={code} onChange={event => setCode(event.target.value)} /><button className="text-primary font-medium px-3 disabled:opacity-40" disabled={!code.trim() || busy}>Join</button></form>
+        </div>{error && <p role="alert" className="mt-5 text-meet-red">{error}</p>}
+      </section>
+      <section className="text-center"><div className="mx-auto w-60 h-60 rounded-full bg-blue-50 grid place-items-center text-primary [&_svg]:w-28 [&_svg]:h-28 [&_svg]:fill-primary"><Videocall /></div><h2 className="mt-8 text-2xl">Get a link you can share</h2><p className="mt-3 text-meet-gray max-w-sm mx-auto">Create a meeting, share its link, and admit people when you’re ready.</p></section>
     </div>
-  );
-};
-
-export default Home;
+    {recent.length > 0 && <section className="mt-16 border-t border-hairline-gray pt-8"><h2 className="text-xl mb-4">Recent meetings</h2><div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">{recent.map(meeting => <div key={meeting.id} className="border border-hairline-gray rounded-xl p-4"><p className="font-medium">{meeting.id}</p><p className="text-sm text-meet-gray mt-1">{meeting.host || 'Meeting'} · {new Date(meeting.createdAt).toLocaleDateString()}</p><div className="flex gap-5 mt-4">{!meeting.ended && <a className="text-primary text-sm" href={`/${meeting.id}`}>Join meeting</a>}{meeting.isHost && <a className="text-primary text-sm" href={`/${meeting.id}/meeting-end?reason=history`}>Recordings</a>}{meeting.ended && <span className="text-sm text-meet-gray">Ended</span>}</div></div>)}</div></section>}
+    <MeetingLinkPopup isOpen={!!link} onClose={() => setLink('')} meetingId={link} baseUrl={typeof window === 'undefined' ? '' : window.location.origin} />
+  </main></div>;
+}
