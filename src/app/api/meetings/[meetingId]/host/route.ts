@@ -93,7 +93,13 @@ export async function POST(request: Request, context: Context) {
       case 'mute': {
         if (typeof body.userId !== 'string' || body.userId === host.id)
           throw new HttpError(400, 'Select another participant.');
-        await call.muteUsers({ user_ids: [body.userId], audio: true });
+        // Server-authenticated requests must identify the moderator explicitly;
+        // unlike client tokens, the server token has no acting user identity.
+        await call.muteUsers({
+          user_ids: [body.userId],
+          audio: true,
+          muted_by_id: host.id,
+        });
         break;
       }
       case 'end':

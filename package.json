@@ -12,7 +12,8 @@
     "setup:stream": "node --env-file=.env scripts/setup-stream.mjs",
     "format": "prettier --write src scripts tests *.json next.config.mjs",
     "format:check": "prettier --check src scripts tests *.json next.config.mjs",
-    "verify:services": "node --env-file=.env --import tsx scripts/verify-services.mts"
+    "verify:services": "node --env-file=.env --import tsx scripts/verify-services.mts",
+    "verify:mute": "node --env-file=.env --import tsx scripts/verify-mute.mts"
   },
   "dependencies": {
     "@clerk/nextjs": "6.39.7",
