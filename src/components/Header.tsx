@@ -57,9 +57,10 @@ export default function Header({ navItems = true }: { navItems?: boolean }) {
             in meeting settings.
           </p>
           <p>
-            During a meeting, use the More options menu for captions,
-            whiteboard, recordings, and settings. The host can admit people and
-            manage access from Host controls.
+            During a meeting, use the bottom controls for captions, whiteboard,
+            reactions, recordings, and settings. On smaller screens, additional
+            controls are in More options. The host can admit people and manage
+            access from Host controls.
           </p>
           <p>
             Keyboard shortcuts: Ctrl/⌘ + D toggles your microphone, Ctrl/⌘ + E

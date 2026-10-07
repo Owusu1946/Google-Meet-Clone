@@ -62,6 +62,8 @@ function useRoomState() {
   const board = useWhiteboard();
   const [showCaptions, setShowCaptions] = useState(false);
   const [panel, setPanel] = useState<Panel>(null);
+  const [toolbarActionCount, setToolbarActionCount] = useState(0);
+  const [reactionPicker, setReactionPicker] = useState(false);
   const [menu, setMenu] = useState(false);
   const [whiteboard, setWhiteboard] = useState(false);
   useEffect(() => {
@@ -342,6 +344,10 @@ function useRoomState() {
     setPanel,
     menu,
     setMenu,
+    toolbarActionCount,
+    setToolbarActionCount,
+    reactionPicker,
+    setReactionPicker,
     whiteboard,
     setWhiteboard,
     invite,

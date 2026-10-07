@@ -1,25 +1,18 @@
+import { useEffect } from 'react';
+import useMeetingActions from '@/hooks/useMeetingActions';
 import { useRoom } from '@/contexts/MeetingRoomContext';
 import Dialog from './Dialog';
 import AddPeoplePopup from './AddPeoplePopup';
-import { api } from '@/lib/meeting';
 
 export default function MeetingDialogs() {
   const room = useRoom();
+  const actions = useMeetingActions();
   const {
     access,
     menu,
     setMenu,
-    setPanel,
-    whiteboard,
-    setWhiteboard,
-    showCaptions,
-    toggleCaptions,
-    canShare,
-    share,
     busy,
     run,
-    recording,
-    canRecord,
     call,
     leavePrompt,
     setLeavePrompt,
@@ -32,6 +25,9 @@ export default function MeetingDialogs() {
     invite,
     setInvite,
   } = room;
+  useEffect(() => {
+    if (menu && room.toolbarActionCount >= actions.length) setMenu(false);
+  }, [menu, room.toolbarActionCount, actions.length, setMenu]);
   return (
     <>
       <Dialog
@@ -40,130 +36,36 @@ export default function MeetingDialogs() {
         title="Meeting options"
       >
         <div className="grid grid-cols-2 gap-2">
-          {(
-            [
-              ['details', 'Meeting details'],
-              ['people', 'People'],
-              ['chat', 'Chat'],
-              ['settings', 'Settings'],
-            ] as const
-          ).map(([id, label]) => (
+          {actions.slice(room.toolbarActionCount).map((action) => (
             <button
+              key={action.id}
               className="option-button"
-              key={id}
+              disabled={action.disabled}
+              aria-pressed={action.active}
               onClick={() => {
-                setPanel(id);
                 setMenu(false);
+                action.onClick();
               }}
             >
-              {label}
+              {action.title}
             </button>
           ))}
-          <button
-            className="option-button"
-            onClick={() => {
-              setWhiteboard((value) => !value);
-              setMenu(false);
-            }}
-          >
-            {whiteboard ? 'Close whiteboard' : 'Open whiteboard'}
-          </button>
-          <button
-            className="option-button"
-            onClick={() => {
-              setMenu(false);
-              void toggleCaptions();
-            }}
-          >
-            {showCaptions ? 'Hide captions' : 'Show captions'}
-          </button>
-          <button
-            className="option-button"
-            disabled={busy || !room.local}
-            onClick={() => {
-              setMenu(false);
-              void run(() =>
-                api(`/api/meetings/${access.meetingId}/state`, {
-                  method: 'POST',
-                  body: JSON.stringify({
-                    raised: !room.raised,
-                    sessionId: room.local?.sessionId,
-                  }),
-                }),
-              );
-            }}
-          >
-            {room.raised ? 'Lower hand' : 'Raise hand'}
-          </button>
-          <button
-            className="option-button"
-            disabled={!canShare || busy}
-            onClick={() => {
-              setMenu(false);
-              void run(() => share.screenShare.toggle());
-            }}
-          >
-            {share.optimisticIsMute ? 'Present now' : 'Stop presenting'}
-          </button>
-          {access.isHost && (
-            <>
-              <button
-                className="option-button"
-                disabled={busy}
-                onClick={() => {
-                  setMenu(false);
-                  void run(() =>
-                    hostAction('settings', {
-                      boardPresenting: room.custom.boardPresenting !== true,
-                    }),
-                  );
-                }}
-              >
-                {room.custom.boardPresenting
-                  ? 'Stop presenting whiteboard'
-                  : 'Present whiteboard to everyone'}
-              </button>
-              <button
-                className="option-button"
-                onClick={() => {
-                  setPanel('host');
-                  setMenu(false);
-                }}
-              >
-                Host controls
-              </button>
-              <button
-                className="option-button"
-                onClick={() => {
-                  setPanel('recordings');
-                  setMenu(false);
-                }}
-              >
-                Recordings
-              </button>
-              <button
-                disabled={!canRecord || busy}
-                className="option-button"
-                onClick={() => {
-                  setMenu(false);
-                  if (recording) void run(() => call.stopRecording());
-                  else setRecordPrompt(true);
-                }}
-              >
-                {recording ? 'Stop recording' : 'Start recording'}
-              </button>
-            </>
-          )}
         </div>
-        <h3 className="text-sm font-medium mt-6 mb-3">Send a reaction</h3>
+      </Dialog>
+      <Dialog
+        open={room.reactionPicker}
+        onClose={() => room.setReactionPicker(false)}
+        title="Send a reaction"
+      >
         <div className="flex flex-wrap gap-2">
           {['👍', '❤️', '😂', '😮', '👏', '🎉'].map((emoji) => (
             <button
               key={emoji}
+              disabled={busy}
               aria-label={`Send ${emoji} reaction`}
-              className="text-2xl rounded-lg p-2 hover:bg-light-gray"
+              className="text-2xl rounded-lg p-2 hover:bg-light-gray disabled:opacity-40"
               onClick={() => {
-                setMenu(false);
+                room.setReactionPicker(false);
                 void run(() =>
                   call.sendReaction({ type: 'emoji', emoji_code: emoji }),
                 );
