@@ -237,18 +237,37 @@ function useRoomState() {
   }, [call, access.identity.id, access.meetingId, router, addReaction]);
   useEffect(() => {
     if (!channel) return;
-    const subscription = channel.on('message.new', (event) => {
-      if (panel !== 'chat' && event.user?.id !== access.identity.id)
-        setUnread((count) => count + 1);
+    let readTimer: ReturnType<typeof setTimeout> | undefined;
+    const sync = () => setUnread(panel === 'chat' ? 0 : channel.countUnread());
+    const markRead = () => {
+      clearTimeout(readTimer);
+      if (panel === 'chat' && document.visibilityState === 'visible')
+        readTimer = setTimeout(() => {
+          void channel.markRead().catch(() => undefined);
+        }, 250);
+    };
+    sync();
+    markRead();
+    const subscription = channel.on((event) => {
+      if (
+        [
+          'message.new',
+          'message.deleted',
+          'message.read',
+          'notification.mark_read',
+          'channel.updated',
+        ].includes(event.type)
+      )
+        sync();
+      if (event.type === 'message.new') markRead();
     });
-    return () => subscription.unsubscribe();
-  }, [channel, panel, access.identity.id]);
-  useEffect(() => {
-    if (panel === 'chat') {
-      setUnread(0);
-      void channel?.markRead().catch(() => undefined);
-    }
-  }, [panel, channel]);
+    document.addEventListener('visibilitychange', markRead);
+    return () => {
+      subscription.unsubscribe();
+      clearTimeout(readTimer);
+      document.removeEventListener('visibilitychange', markRead);
+    };
+  }, [channel, panel]);
   useEffect(() => {
     if (leaving.current) return;
     if (endedAt || state === CallingState.LEFT) {
