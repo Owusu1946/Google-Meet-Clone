@@ -3,6 +3,7 @@ import useTime from '@/hooks/useTime';
 import Info from './icons/Info';
 import AdmissionPopover from './AdmissionPopover';
 import PeopleSummary from './PeopleSummary';
+import PresentationStatus from './PresentationStatus';
 export default function MeetingTopbar() {
   const room = useRoom();
   const { currentTime } = useTime();
@@ -23,6 +24,7 @@ export default function MeetingTopbar() {
         </button>
       </div>
       <div className="meeting-topbar-people">
+        <PresentationStatus />
         <AdmissionPopover />
         <PeopleSummary />
       </div>

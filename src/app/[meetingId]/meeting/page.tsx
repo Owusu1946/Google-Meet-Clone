@@ -1,7 +1,11 @@
 'use client';
 import { useEffect, useRef } from 'react';
 import { useParams } from 'next/navigation';
-import { CallingState, StreamTheme } from '@stream-io/video-react-sdk';
+import {
+  CallingState,
+  hasScreenShare,
+  StreamTheme,
+} from '@stream-io/video-react-sdk';
 import MeetProvider from '@/contexts/MeetProvider';
 import { MeetingRoomProvider, useRoom } from '@/contexts/MeetingRoomContext';
 import { RaisedHandsProvider } from '@/contexts/RaisedHandsContext';
@@ -16,19 +20,28 @@ import ReactionOverlay from '@/components/ReactionOverlay';
 import MeetingToolbar from '@/components/MeetingToolbar';
 import MeetingPanels from '@/components/MeetingPanels';
 import MeetingDialogs from '@/components/MeetingDialogs';
+import PresentationLayout from '@/components/PresentationLayout';
+import PresentingIcon from '@/components/icons/PresentToAll';
+import {
+  PresenterPipProvider,
+  usePresenterWindow,
+} from '@/contexts/PresenterPipContext';
 
 export default function MeetingPage() {
   const { meetingId } = useParams<{ meetingId: string }>();
   return (
     <MeetProvider meetingId={meetingId}>
       <MeetingRoomProvider>
-        <MeetingRoom />
+        <PresenterPipProvider>
+          <MeetingRoom />
+        </PresenterPipProvider>
       </MeetingRoomProvider>
     </MeetProvider>
   );
 }
 function MeetingRoom() {
   const room = useRoom();
+  const pip = usePresenterWindow();
   const {
     panel,
     spotlight,
@@ -63,7 +76,18 @@ function MeetingRoom() {
         <main className={`meeting-content ${panel ? 'has-panel' : ''}`}>
           <div className="meeting-stage">
             <RaisedHandsProvider value={{ raisedUserIds }}>
-              {spotlight ? (
+              {pip.pip ? (
+                <div className="presenter-pip-placeholder">
+                  <PresentingIcon />
+                  <h2>Picture-in-picture is open while you’re presenting</h2>
+                  <p>
+                    See the people in your call while you share your screen.
+                  </p>
+                  <button onClick={pip.close}>Bring the call back here</button>
+                </div>
+              ) : room.participants.some(hasScreenShare) ? (
+                <PresentationLayout />
+              ) : spotlight ? (
                 <SpeakerLayout />
               ) : room.layout === 'auto' && room.participants.length <= 2 ? (
                 <FocusLayout />
