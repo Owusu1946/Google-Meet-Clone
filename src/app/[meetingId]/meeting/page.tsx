@@ -75,17 +75,17 @@ function MeetingRoom() {
                     <SmartWhiteboardOverlay
                       open
                       onClose={() => {
-                        if (room.custom.boardPresenting === true) {
-                          void room.run(async () => {
-                            if (!(await room.board.flush()))
-                              throw new Error(
-                                'Save board edits before stopping the presentation.',
-                              );
+                        void room.run(async () => {
+                          if (!(await room.board.flush()))
+                            throw new Error(
+                              'Save board edits before closing the whiteboard.',
+                            );
+                          if (room.custom.boardPresenting === true)
                             await room.hostAction('settings', {
                               boardPresenting: false,
                             });
-                          });
-                        } else setWhiteboard(false);
+                          else setWhiteboard(false);
+                        });
                       }}
                     />
                   }

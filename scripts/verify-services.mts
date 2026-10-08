@@ -1,3 +1,6 @@
+import { writeFile, unlink } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import assert from 'node:assert/strict';
 import { randomInt, randomUUID } from 'node:crypto';
 import { StreamClient } from '@stream-io/node-sdk';
@@ -7,7 +10,9 @@ import {
   type Channel,
   type Event,
 } from 'stream-chat';
-import { boardBatch } from '../src/lib/whiteboard';
+import { textDocument, insertedAtomIds } from '../src/lib/workspace-text';
+import { newObject, workspaceObjects } from '../src/lib/workspace';
+import { boardBatch, canonicalBoardOperations } from '../src/lib/whiteboard';
 import { signGuest } from '../src/lib/server/guest-session';
 
 // Explicitly opt in: creates disposable fixtures in the configured Stream app.
@@ -131,6 +136,11 @@ async function servicePermission(
   checks++;
 }
 
+const fixtureManifest = join(tmpdir(), `meet-verification-${id}.json`);
+await writeFile(fixtureManifest, JSON.stringify({ id, users }), {
+  encoding: 'utf8',
+  mode: 0o600,
+});
 try {
   await video.upsertUsers(
     users.map((user) => ({
@@ -336,6 +346,193 @@ try {
   console.log(
     `Authenticated board preview delivered in ${Math.round(performance.now() - previewStart)}ms (one sample, not a production latency guarantee).`,
   );
+  const objectId = `${applicant}:${randomUUID()}`;
+  const createObject = {
+    id: randomUUID(),
+    kind: 'object-create',
+    objectId,
+    objectType: 'card',
+    fields: newObject('card', 40, 50),
+  };
+  const objectEvent = nextEvent(
+    boardReceiver,
+    'message.new',
+    (event) =>
+      (event.message?.board_operation as { kind?: string } | undefined)
+        ?.kind === 'object-create',
+  );
+  const createdObject = await request(`${path}/board`, applicant, createObject);
+  assert.equal((await objectEvent).message?.user?.id, applicant);
+  checks++;
+  const objectRetry = await request(`${path}/board`, applicant, createObject);
+  assert.deepEqual(createdObject, objectRetry);
+  checks++;
+  const movedObject = await request(`${path}/board`, host, {
+    id: randomUUID(),
+    kind: 'object-patch',
+    objectId,
+    fields: { x: 400, y: 250 },
+  });
+  const writtenObject = await request(`${path}/board`, applicant, {
+    id: randomUUID(),
+    kind: 'object-patch',
+    objectId,
+    fields: { text: 'Shared task' },
+  });
+  const replay = workspaceObjects([
+    writtenObject.operation,
+    createdObject.operation,
+    movedObject.operation,
+  ]);
+  assert.equal(replay[0].x, 400);
+  assert.equal(replay[0].text, 'Shared task');
+  checks++;
+  const presenceEvent = nextEvent(
+    boardReceiver,
+    'board_presence' as EventTypes,
+  );
+  await boardSender.sendEvent({
+    type: 'board_presence' as EventTypes,
+    presence: {
+      point: { x: 20, y: 40 },
+      selected: [objectId],
+      editing: objectId,
+    },
+  });
+  assert.equal((await presenceEvent).user?.id, applicant);
+  checks++;
+  const liveObjectEvent = nextEvent(
+    boardReceiver,
+    'board_preview' as EventTypes,
+  );
+  await boardSender.sendEvent({
+    type: 'board_preview' as EventTypes,
+    operations: [
+      {
+        ...movedObject.operation,
+        id: randomUUID(),
+        actor: applicant,
+        fields: { x: 500 },
+      },
+    ],
+  });
+  assert.equal((await liveObjectEvent).user?.id, applicant);
+  checks++;
+  const restoredHistory = await boardReceiver.query({
+    messages: { limit: 100 },
+  });
+  const restoredObjects = workspaceObjects(
+    restoredHistory.messages.flatMap((message) =>
+      canonicalBoardOperations(
+        message.board_operations || message.board_operation,
+        message.user?.id || '',
+        message.created_at!,
+        message.id,
+      ),
+    ),
+  );
+  assert.equal(
+    restoredObjects.find((item) => item.id === objectId)?.text,
+    'Shared task',
+  );
+  checks++;
+  const hostText = {
+    id: randomUUID(),
+    kind: 'text-insert',
+    objectId,
+    after: null,
+    text: '[Host]',
+    clock: 1,
+  };
+  const guestText = {
+    id: randomUUID(),
+    kind: 'text-insert',
+    objectId,
+    after: null,
+    text: '[Guest]',
+    clock: 1,
+  };
+  const [hostSaved, guestSaved] = await Promise.all([
+    request(`${path}/board`, host, hostText),
+    request(`${path}/board`, applicant, guestText),
+  ]);
+  const textHistory = [
+    createdObject.operation,
+    writtenObject.operation,
+    hostSaved.operation,
+    guestSaved.operation,
+  ];
+  const concurrentText = textDocument(objectId, textHistory).text;
+  assert.ok(
+    concurrentText.includes('[Host]') &&
+      concurrentText.includes('[Guest]') &&
+      concurrentText.endsWith('Shared task'),
+  );
+  assert.equal(
+    textDocument(objectId, [...textHistory].reverse()).text,
+    concurrentText,
+  );
+  checks++;
+  assert.deepEqual(
+    (await request(`${path}/board`, host, hostText)).operation,
+    hostSaved.operation,
+  );
+  checks++;
+  const undoText = await request(`${path}/board`, host, {
+    id: randomUUID(),
+    kind: 'text-visible',
+    objectId,
+    atomIds: insertedAtomIds(hostText.id, hostText.text),
+    visible: false,
+  });
+  assert.equal(
+    textDocument(objectId, [...textHistory, undoText.operation]).text,
+    '[Guest]Shared task',
+  );
+  checks++;
+  const textRecovery = await boardReceiver.query({ messages: { limit: 100 } });
+  const recoveredText = textDocument(
+    objectId,
+    textRecovery.messages.flatMap((message) =>
+      canonicalBoardOperations(
+        message.board_operations || message.board_operation,
+        message.user?.id || '',
+        message.created_at!,
+        message.id,
+      ),
+    ),
+  ).text;
+  assert.equal(recoveredText, '[Guest]Shared task');
+  checks++;
+  await request(
+    `${path}/board`,
+    applicant,
+    { ...createObject, id: randomUUID(), objectId: `${host}:forged` },
+    400,
+  );
+  await request(
+    `${path}/board`,
+    outsider,
+    {
+      id: randomUUID(),
+      kind: 'object-patch',
+      objectId,
+      fields: { text: 'Outside' },
+    },
+    403,
+  );
+  const hiddenObject = await request(`${path}/board`, host, {
+    id: randomUUID(),
+    kind: 'object-visible',
+    objectId,
+    visible: false,
+  });
+  assert.equal(
+    workspaceObjects([createdObject.operation, hiddenObject.operation])[0]
+      .visible,
+    false,
+  );
+  checks++;
   await request(`${path}/recordings`, applicant, undefined, 403);
   await request(`${path}/recordings`, host);
   const stroke = {
@@ -410,6 +607,23 @@ try {
     { ...stroke, id: randomUUID() },
     403,
   );
+  await request(
+    `${path}/board`,
+    applicant,
+    { ...guestText, id: randomUUID() },
+    403,
+  );
+  await request(
+    `${path}/board`,
+    applicant,
+    {
+      id: randomUUID(),
+      kind: 'object-patch',
+      objectId,
+      fields: { x: 1 },
+    },
+    403,
+  );
   assert.equal(
     (await request(`${path}/access`, outsider, { ask: true })).status,
     'locked',
@@ -454,14 +668,20 @@ try {
       .catch(() => undefined),
     call.delete({ hard: true }),
   ]);
-  if (cleanup.some((result) => result.status === 'rejected')) {
+  const cleanupFailed = cleanup.some((result) => result.status === 'rejected');
+  if (cleanupFailed) {
     console.error(`Fixture cleanup needs retry for meeting ${id}.`);
     process.exitCode = 1;
   }
+  let usersCleanupFailed = false;
   await video
     .deleteUsers({ user_ids: users, user: 'hard', messages: 'hard' })
     .catch(() => {
+      usersCleanupFailed = true;
       console.error('Disposable user cleanup failed.');
       process.exitCode = 1;
     });
+  if (!cleanupFailed && !usersCleanupFailed)
+    await unlink(fixtureManifest).catch(() => undefined);
+  else console.error(`Fixture manifest retained: ${fixtureManifest}`);
 }

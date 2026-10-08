@@ -1,3 +1,9 @@
+import { validTextMutation, type TextMutation } from './workspace-text';
+import {
+  validWorkspaceMutation,
+  compareOperations,
+  type WorkspaceMutation,
+} from './workspace';
 export type Point = { x: number; y: number };
 export type StrokeMode = 'pen' | 'highlighter' | 'eraser';
 export type BoardOperation = {
@@ -17,6 +23,8 @@ export type BoardOperation = {
       width: number;
     }
   | { kind: 'visibility'; strokeId: string; visible: boolean }
+  | TextMutation
+  | WorkspaceMutation
   | { kind: 'clear' }
 );
 export type BoardStroke = {
@@ -47,6 +55,14 @@ export function validOperation(input: unknown): input is BoardOperation {
   )
     return false;
   if (operation.kind === 'clear') return true;
+  if (operation.kind === 'text-insert' || operation.kind === 'text-visible')
+    return validTextMutation(operation);
+  if (
+    operation.kind === 'object-create' ||
+    operation.kind === 'object-patch' ||
+    operation.kind === 'object-visible'
+  )
+    return validWorkspaceMutation(operation, operation.actor);
   if (
     typeof operation.strokeId !== 'string' ||
     operation.strokeId.length > 160 ||
@@ -87,13 +103,7 @@ export function boardStrokes(operations: BoardOperation[]): BoardStroke[] {
   const visible = new Map<string, boolean>();
   const seen = new Set<string>();
   // Service timestamps establish shared order; IDs provide a deterministic tie break.
-  const ordered = [...operations].sort(
-    (a, b) =>
-      a.time.localeCompare(b.time) ||
-      (a.batch || a.id).localeCompare(b.batch || b.id) ||
-      (a.order || 0) - (b.order || 0) ||
-      a.id.localeCompare(b.id),
-  );
+  const ordered = [...operations].sort(compareOperations);
   for (const operation of ordered) {
     if (seen.has(operation.id) || !validOperation(operation)) continue;
     seen.add(operation.id);
@@ -106,6 +116,7 @@ export function boardStrokes(operations: BoardOperation[]): BoardStroke[] {
       visible.set(operation.strokeId, operation.visible);
       continue;
     }
+    if (operation.kind !== 'stroke') continue;
     let stroke = strokes.get(operation.strokeId);
     if (!stroke) {
       stroke = {

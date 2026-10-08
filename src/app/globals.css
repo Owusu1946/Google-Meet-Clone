@@ -2198,3 +2198,241 @@ input:focus-visible {
   gap: 10px;
   padding: 5px 14px 5px 8px;
 }
+.workspace-viewport {
+  background-color: #fafbfc;
+  background-image: radial-gradient(#cbd5e1 1px, transparent 1px);
+  background-size: 24px 24px;
+  overflow: hidden;
+}
+.workspace-scene {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  touch-action: none;
+  outline-offset: -3px;
+}
+.workspace-world {
+  position: absolute;
+  inset: 0;
+  transform-origin: 0 0;
+  pointer-events: none;
+}
+.workspace-object {
+  position: absolute;
+  border: 1.5px solid #cbd5e1;
+  border-radius: 12px;
+  padding: 16px;
+  color: #1e293b;
+  box-shadow: 0 3px 12px #0f172a0b;
+  cursor: move;
+  user-select: none;
+  overflow: visible;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.workspace-object.selected,
+.workspace-object.connect-source {
+  outline: 2px solid #2563eb;
+  outline-offset: 3px;
+}
+.workspace-object-text {
+  white-space: pre-wrap;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+  max-height: 100%;
+  width: 100%;
+  text-align: center;
+  pointer-events: none;
+}
+.workspace-object textarea {
+  resize: none;
+  width: 100%;
+  height: 100%;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  user-select: text;
+}
+.object-note {
+  border: 0;
+  border-radius: 3px;
+  box-shadow: 0 6px 14px #0f172a18;
+  align-items: flex-start;
+}
+.object-note .workspace-object-text,
+.object-text .workspace-object-text,
+.object-card .workspace-object-text,
+.object-code .workspace-object-text {
+  text-align: left;
+}
+.object-text {
+  border-color: transparent;
+  box-shadow: none;
+  align-items: flex-start;
+}
+.object-code {
+  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+  align-items: flex-start;
+}
+.object-frame,
+.object-column {
+  align-items: flex-start;
+  justify-content: flex-start;
+  padding: 12px 16px;
+  border: 1.5px dashed #94a3b8;
+  box-shadow: none;
+}
+.object-frame .workspace-object-text,
+.object-column .workspace-object-text {
+  font-size: 16px;
+  font-weight: 600;
+  text-align: left;
+  height: 24px;
+}
+.object-frame textarea,
+.object-column textarea {
+  height: 30px;
+}
+.object-column {
+  border-style: solid;
+  border-radius: 16px;
+}
+.object-card {
+  align-items: flex-start;
+  border-top: 5px solid #818cf8;
+}
+.object-ellipse {
+  border-radius: 50%;
+}
+.object-diamond {
+  clip-path: polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%);
+  padding: 25%;
+}
+.workspace-container-label {
+  position: absolute;
+  top: 15px;
+  right: 14px;
+  font-size: 11px;
+  font-weight: 500;
+  color: #64748b;
+  pointer-events: none;
+}
+.workspace-resize {
+  position: absolute;
+  bottom: -7px;
+  right: -7px;
+  width: 14px;
+  height: 14px;
+  border: 2px solid #2563eb;
+  border-radius: 3px;
+  background: white;
+  cursor: nwse-resize;
+  touch-action: none;
+}
+.workspace-connections {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  pointer-events: none;
+}
+.workspace-contextbar {
+  padding: 5px 12px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  background: #eff6ff;
+  color: #334155;
+  font-size: 11px;
+  border-bottom: 1px solid #dbeafe;
+}
+.workspace-contextbar label {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+.workspace-contextbar input {
+  width: 24px;
+  height: 24px;
+}
+.workspace-contextbar select {
+  background: white;
+  border-radius: 4px;
+  padding: 3px;
+}
+.workspace-hint {
+  position: absolute;
+  bottom: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: #1e293b;
+  color: white;
+  padding: 8px 16px;
+  border-radius: 20px;
+  font-size: 12px;
+  pointer-events: none;
+}
+.workspace-peer-layer {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  overflow: hidden;
+}
+.workspace-peer-selection {
+  position: absolute;
+  border: 2px solid;
+  border-radius: 14px;
+}
+.workspace-peer-selection span {
+  position: absolute;
+  bottom: 100%;
+  left: -2px;
+  color: white;
+  font: 10px/1.4 sans-serif;
+  padding: 2px 5px;
+  border-radius: 4px 4px 0 0;
+  white-space: nowrap;
+}
+.workspace-peer-cursor {
+  position: absolute;
+  display: flex;
+  align-items: flex-start;
+}
+.workspace-peer-cursor span {
+  color: white;
+  font: 11px/1.4 sans-serif;
+  padding: 3px 6px;
+  border-radius: 6px;
+  margin-top: 16px;
+  white-space: nowrap;
+}
+.workspace-connections {
+  z-index: 1;
+}
+.object-diamond {
+  clip-path: none;
+  padding: 24px;
+  border: 0;
+  box-shadow: none;
+}
+.workspace-diamond {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: -1;
+}
+.workspace-contextbar input[aria-label='Selected object content'] {
+  width: 180px;
+  height: 26px;
+  border: 1px solid #cbd5e1;
+  border-radius: 4px;
+  padding: 3px 6px;
+  background: white;
+}
