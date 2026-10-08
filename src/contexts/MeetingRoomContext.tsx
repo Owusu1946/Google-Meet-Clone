@@ -1,4 +1,5 @@
-'use client';
+import { leaveCallOnce } from '@/lib/leave-call';
+('use client');
 import {
   createContext,
   useCallback,
@@ -280,7 +281,7 @@ function useRoomState() {
     }
   }, [endedAt, state, access.meetingId, router]);
   const leave = async (end = false) => {
-    if (busy) return;
+    if (busy || leaving.current) return;
     leaving.current = true;
     const success = await run(async () => {
       if (!(await board.flush()))
@@ -288,17 +289,30 @@ function useRoomState() {
           'Your board edits are not saved yet. Retry syncing before leaving.',
         );
       if (end) await hostAction('end');
-      if (local?.sessionId)
+      if (!end && local?.sessionId)
         await api(`/api/meetings/${access.meetingId}/state`, {
           method: 'POST',
           body: JSON.stringify({ raised: false, sessionId: local.sessionId }),
         }).catch(() => undefined);
-      await call.leave();
+      await leaveCallOnce(call, end);
+      setLeavePrompt(false);
+      setPanel(null);
       router.replace(
         `/${access.meetingId}/meeting-end?reason=${end ? 'ended' : 'left'}`,
       );
     });
-    if (!success) leaving.current = false;
+    if (!success) {
+      leaving.current = false;
+      // An end event may have arrived while the guarded request was failing.
+      if (call.state.endedAt || call.state.callingState === CallingState.LEFT) {
+        leaving.current = true;
+        setLeavePrompt(false);
+        setError('');
+        router.replace(
+          `/${access.meetingId}/meeting-end?reason=${call.state.endedAt ? 'ended' : 'disconnected'}`,
+        );
+      }
+    }
   };
   const toggleCaptions = async () => {
     if (showCaptions) {
