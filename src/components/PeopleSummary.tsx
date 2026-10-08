@@ -54,7 +54,18 @@ export default function PeopleSummary() {
               {preview
                 .map((participant) => participant.name || 'Participant')
                 .join(', ')}
-              {room.participants.length > 4 ? ' and others' : ''}
+              {room.participants.length > 4 && (
+                <button
+                  className="people-summary-others"
+                  onClick={() => {
+                    setOpen(false);
+                    room.setPanel('people');
+                  }}
+                >
+                  {' '}
+                  and {room.participants.length - 4} others
+                </button>
+              )}
             </p>
             <div className="flex gap-2 mt-3">
               {preview.map((participant) => (

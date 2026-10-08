@@ -2058,3 +2058,109 @@ input:focus-visible {
     grid-auto-rows: minmax(80px, 1fr);
   }
 }
+.grouped-participant-grid {
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: repeat(var(--grid-columns), minmax(0, 1fr));
+  grid-auto-rows: minmax(0, 1fr);
+  gap: 12px;
+}
+.grouped-participant-grid > audio {
+  display: none;
+}
+.grouped-participant-tile {
+  min-width: 0;
+  min-height: 0;
+  border-radius: 20px;
+  overflow: hidden;
+}
+.root-theme .grouped-participant-tile > .str-video__participant-view {
+  width: 100%;
+  height: 100%;
+  max-width: none;
+  aspect-ratio: unset;
+}
+.grouped-others-tile {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  gap: 16px;
+  background: #3c4043;
+  color: #e8eaed;
+  border-radius: 20px;
+  min-width: 0;
+  min-height: 0;
+  font-size: clamp(14px, 2vw, 20px);
+}
+.grouped-others-tile:hover {
+  background: #4b5053;
+}
+.grouped-others-avatars {
+  display: flex;
+  padding-left: 12px;
+}
+.grouped-others-avatars > * {
+  margin-left: -12px;
+  border: 2px solid #3c4043;
+  flex-shrink: 0;
+}
+@media (max-width: 600px) {
+  .grouped-participant-grid {
+    gap: 8px;
+  }
+  .grouped-participant-tile,
+  .grouped-others-tile {
+    border-radius: 14px;
+  }
+}
+.admit-all-button {
+  color: #a8c7fa;
+  display: block;
+  margin: 0 0 16px auto;
+  padding: 8px 12px;
+  border-radius: 20px;
+  font-size: 14px;
+}
+.admit-all-button:hover {
+  background: #3c4043;
+}
+.admit-all-button:disabled {
+  opacity: 0.5;
+}
+.admit-all-dialog {
+  background: #e8eef9;
+  border-radius: 28px;
+}
+.admit-all-names {
+  max-height: 30dvh;
+  overflow-y: auto;
+  margin-top: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.admit-all-names li {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 14px;
+  overflow-wrap: anywhere;
+}
+.admit-all-names li > span {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  background: #006aa6;
+  color: white;
+}
+.people-summary-others {
+  color: #a8c7fa;
+  text-decoration: underline;
+  border-radius: 4px;
+}

@@ -1,111 +1,68 @@
-import { useEffect, useMemo, useState } from 'react';
-import {
-  combineComparators,
-  Comparator,
-  IconButton,
-  ParticipantView,
-  pinned,
-  screenSharing,
-  StreamVideoParticipant,
-  useCall,
-  useCallStateHooks,
-} from '@stream-io/video-react-sdk';
-import clsx from 'clsx';
-
+import { useEffect, useRef, useState, type CSSProperties } from 'react';
+import { Audio, ParticipantView } from '@stream-io/video-react-sdk';
+import { useRoom } from '@/contexts/MeetingRoomContext';
+import { groupedParticipants } from '@/lib/participant-grid';
 import ParticipantViewUI from './ParticipantViewUI';
 import VideoPlaceholder from './VideoPlaceholder';
+import Avatar from './Avatar';
 
-const GROUP_SIZE = 6;
-
-const GridLayout = () => {
-  const call = useCall();
-  const { useParticipants } = useCallStateHooks();
-  const participants = useParticipants();
-  const [page, setPage] = useState(0);
-
-  const pageCount = useMemo(
-    () => Math.ceil(participants.length / GROUP_SIZE),
-    [participants],
-  );
-
-  const participantGroups = useMemo(() => {
-    // divide participants into groups of 6
-    const groups = [];
-    for (let i = 0; i < participants.length; i += GROUP_SIZE) {
-      groups.push(participants.slice(i, i + GROUP_SIZE));
-    }
-
-    return groups;
-  }, [participants]);
-
-  const selectedGroup =
-    participantGroups[Math.min(page, Math.max(0, pageCount - 1))] || [];
-
+export default function GridLayout() {
+  const room = useRoom();
+  const container = useRef<HTMLDivElement>(null);
+  const [capacity, setCapacity] = useState(9);
   useEffect(() => {
-    if (!call) return;
-    const customSortingPreset = getCustomSortingPreset();
-    call.setSortParticipantsBy(customSortingPreset);
-  }, [call]);
-
-  useEffect(() => {
-    if (page > pageCount - 1) {
-      setPage(Math.max(0, pageCount - 1));
-    }
-  }, [page, pageCount]);
-
-  const getCustomSortingPreset = (): Comparator<StreamVideoParticipant> => {
-    return combineComparators(screenSharing, pinned);
-  };
-
+    if (!container.current) return;
+    const observer = new ResizeObserver(([entry]) => {
+      const { width, height } = entry.contentRect;
+      setCapacity(width < 600 ? 4 : width < 960 || height < 430 ? 6 : 9);
+    });
+    observer.observe(container.current);
+    return () => observer.disconnect();
+  }, []);
+  const { visible, hidden } = groupedParticipants(room.participants, capacity);
+  const tiles = visible.length + (hidden.length ? 1 : 0);
   return (
     <div
-      className={clsx(
-        'w-full relative overflow-hidden',
-        'str-video__paginated-grid-layout',
-      )}
+      ref={container}
+      className="grouped-participant-grid"
+      style={{ '--grid-columns': tiles <= 4 ? 2 : 3 } as CSSProperties}
     >
-      {pageCount > 1 && (
-        <IconButton
-          aria-label="Previous participants"
-          icon="caret-left"
-          disabled={page === 0}
-          onClick={() => setPage((currentPage) => Math.max(0, currentPage - 1))}
-        />
-      )}
-      <div
-        className={clsx('str-video__paginated-grid-layout__group', {
-          'str-video__paginated-grid-layout--one': selectedGroup.length === 1,
-          'str-video__paginated-grid-layout--two-four':
-            selectedGroup.length >= 2 && selectedGroup.length <= 4,
-          'str-video__paginated-grid-layout--five-nine':
-            selectedGroup.length >= 5 && selectedGroup.length <= 9,
-        })}
-      >
-        {call && selectedGroup.length > 0 && (
-          <>
-            {selectedGroup.map((participant) => (
-              <ParticipantView
-                participant={participant}
-                ParticipantViewUI={ParticipantViewUI}
-                VideoPlaceholder={VideoPlaceholder}
+      {visible.map((participant) => (
+        <div className="grouped-participant-tile" key={participant.sessionId}>
+          <ParticipantView
+            participant={participant}
+            muteAudio
+            ParticipantViewUI={ParticipantViewUI}
+            VideoPlaceholder={VideoPlaceholder}
+          />
+        </div>
+      ))}
+      {hidden.length > 0 && (
+        <button
+          className="grouped-others-tile"
+          onClick={() => room.setPanel('people')}
+          aria-label={`View ${hidden.length} other ${hidden.length === 1 ? 'participant' : 'participants'} in People`}
+        >
+          <span className="grouped-others-avatars" aria-hidden="true">
+            {hidden.slice(0, 2).map((participant) => (
+              <Avatar
                 key={participant.sessionId}
+                participant={participant}
+                width={64}
               />
             ))}
-          </>
-        )}
-      </div>
-      {pageCount > 1 && (
-        <IconButton
-          disabled={page === pageCount - 1}
-          aria-label="Next participants"
-          icon="caret-right"
-          onClick={() =>
-            setPage((currentPage) => Math.min(pageCount - 1, currentPage + 1))
-          }
-        />
+          </span>
+          <span>
+            {hidden.length} {hidden.length === 1 ? 'other' : 'others'}
+          </span>
+        </button>
       )}
+      {/* Audio remains mounted for every remote session, including grouped tiles. */}
+      {room.participants
+        .filter((participant) => !participant.isLocalParticipant)
+        .map((participant) => (
+          <Audio key={participant.sessionId} participant={participant} />
+        ))}
     </div>
   );
-};
-
-export default GridLayout;
+}
