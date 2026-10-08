@@ -305,3 +305,19 @@ export function kanbanReorder(
     y: position * (100000 / Math.max(1, cards.length)),
   }));
 }
+
+export function kanbanAppendRank(
+  column: WorkspaceObject,
+  objects: WorkspaceObject[],
+) {
+  const ranks = objects
+    .filter(
+      (item) =>
+        item.visible && item.type === 'card' && item.parentId === column.id,
+    )
+    .map((item) => item.y);
+  return Math.max(
+    -100000,
+    Math.min(100000, ranks.length ? Math.max(...ranks) + 1 : column.y + 70),
+  );
+}

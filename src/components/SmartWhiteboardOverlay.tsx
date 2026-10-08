@@ -686,21 +686,10 @@ export default function SmartWhiteboardOverlay({
                   const column = workspace.objects.find(
                     (item) => item.id === workspace.selected[0],
                   )!;
-                  const cards = workspace.objects.filter(
-                    (item) => item.visible && item.parentId === column.id,
-                  );
-                  const y = Math.max(
-                    column.y + 70,
-                    ...cards.map((item) => item.y + item.height + 16),
-                  );
-                  workspace.create('card', column.x + 20, y, {
-                    width: column.width - 40,
+                  workspace.create('card', column.x + 20, column.y + 70, {
+                    width: Math.max(40, column.width - 40),
                     parentId: column.id,
                   });
-                  if (y + 190 > column.y + column.height)
-                    workspace.patch(column.id, {
-                      height: Math.min(10000, y + 190 - column.y),
-                    });
                 }}
               >
                 Add card

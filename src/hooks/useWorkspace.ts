@@ -22,6 +22,7 @@ import {
   kanbanLayout,
   kanbanDrop,
   kanbanReorder,
+  kanbanAppendRank,
   containingFrame,
   workspaceTemplate,
   type TemplateName,
@@ -108,6 +109,15 @@ export default function useWorkspace() {
       visible: true,
     };
     item.parentId = containingFrame(item, objects)?.id || item.parentId;
+    if (item.type === 'card' && item.parentId) {
+      const column = objects.find(
+        (object) => object.id === item.parentId && object.type === 'column',
+      );
+      if (column) {
+        if (fields.parentId) item.y = kanbanAppendRank(column, storedObjects);
+        else Object.assign(item, kanbanDrop(item, storedObjects, objects));
+      }
+    }
     createObjects([item]);
     return item.id;
   };

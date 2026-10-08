@@ -457,3 +457,19 @@ test('keyboard Kanban reorder resolves tied ranks and produces bounded patches',
   assert.ok(patches.every((patch) => patch.y >= 0 && patch.y <= 100000));
   assert.deepEqual(kanbanReorder(before[0], -1, raw), []);
 });
+
+import { kanbanAppendRank } from '../src/lib/workspace-layout';
+test('adding a card appends after reordered ranks rather than using displayed coordinates', () => {
+  const raw = workspaceTemplate('Kanban', actor, 0, 0);
+  const column = raw.find((item) => item.type === 'column')!;
+  const card = raw.find((item) => item.type === 'card')!;
+  card.y = 66000;
+  assert.equal(kanbanAppendRank(column, raw), 66001);
+  assert.equal(
+    kanbanAppendRank(
+      column,
+      raw.map((item) => ({ ...item, visible: false })),
+    ),
+    column.y + 70,
+  );
+});
