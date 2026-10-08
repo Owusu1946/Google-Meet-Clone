@@ -1,5 +1,13 @@
 # Manual meeting acceptance
 
+## People and presenter UI
+
+- Hover the top-right participant pill using a mouse: a dark People preview appears. Moving into the preview keeps it open; leaving closes it. Keyboard focus also exposes it; Escape dismisses it. Click the pill or View everyone to open the full People panel. On touch, tap opens the panel directly.
+- Search for names with mixed case/whitespace, clear the search, collapse/expand Contributors, and check the no-results state. Host mute/remove and admission still act on the correct authenticated participant. Screen shares appear as presentation entries under their owners; ordinary participants never gain host actions.
+- Start sharing a tab with audio, a window, and an entire screen. Viewers see the uncropped presentation on the left and camera tiles on the right, including the presenter. Stop through the banner, toolbar, or browser sharing control; normal layout returns. Repeat with People open, mobile/landscape, multiple presenters, and a late joiner. Confirm the presenter's microphone and shared audio each play once.
+- In a browser supporting Document Picture-in-Picture, present, then click Picture-in-picture in the presenter banner. Check remote and local camera tiles, the silent shared-screen thumbnail, live mic/camera state, stop sharing, Back to call, browser close, leave, and host leave confirmation. Resize the floating window and scroll its participant list with many attendees. The main tab shows the return-to-call placeholder while the floating window is open; closing it returns the normal presentation stage.
+- Stop sharing or leave while the floating-window request is pending. No orphan window may remain. Reopen after browser close, double-click the button, deny the request, and retry. Unsupported browsers retain normal screen sharing and omit the unavailable PiP control. PiP opens from an explicit user action rather than automatically after the asynchronous share picker. Verify media continues correctly when the main tab is hidden and across window focus changes; these native/browser behaviors were not automated.
+
 Use a signed-in host plus a second signed-in account and a named guest in separate browser profiles/devices. Repeat the core media checks in Chrome/Edge, Firefox, Safari, and a narrow phone where available. No browser checks were performed by the implementation agent.
 
 ## Meet-style lobby and overlay acceptance

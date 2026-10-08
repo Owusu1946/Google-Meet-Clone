@@ -1,10 +1,13 @@
 import {
   hasAudio,
   hasVideo,
+  hasScreenShare,
   type StreamVideoParticipant,
 } from '@stream-io/video-react-sdk';
 import Avatar from './Avatar';
 import type { JoinRequest } from '@/lib/meeting';
+import { useState } from 'react';
+import PresentToAll from './icons/PresentToAll';
 export default function PeoplePopup({
   participants,
   hostId,
@@ -30,6 +33,7 @@ export default function PeoplePopup({
   onRemove: (id: string) => void;
   busy: boolean;
 }) {
+  const [search, setSearch] = useState('');
   const ordered = [...participants].sort((a, b) =>
     a.userId === hostId
       ? -1
@@ -38,7 +42,17 @@ export default function PeoplePopup({
         : (a.name || a.userId).localeCompare(b.name || b.userId),
   );
   return (
-    <div className="p-5 overflow-y-auto space-y-6">
+    <div className="people-panel-content p-5 overflow-y-auto space-y-6">
+      <label className="people-search">
+        <span aria-hidden="true">⌕</span>
+        <input
+          type="search"
+          aria-label="Search for people"
+          placeholder="Search for people"
+          value={search}
+          onChange={(event) => setSearch(event.target.value)}
+        />
+      </label>
       {isHost && requests.length > 0 && (
         <section>
           <h3 className="text-sm font-medium mb-3">
@@ -68,53 +82,88 @@ export default function PeoplePopup({
         </section>
       )}
       <section>
-        <h3 className="text-sm font-medium mb-4">
-          In the meeting ({participants.length})
-        </h3>
-        <ul className="space-y-5">
-          {ordered.map((participant) => (
-            <li key={participant.sessionId}>
-              <div className="flex gap-3 items-center">
-                <Avatar participant={participant} width={36} />
-                <div className="min-w-0 flex-1">
-                  <p className="text-sm font-medium truncate">
-                    {participant.name || participant.userId}
-                    {participant.userId === meId ? ' (You)' : ''}
-                  </p>
-                  <p className="text-xs text-meet-gray mt-1">
-                    {participant.userId === hostId ? 'Host · ' : ''}
-                    {hasAudio(participant) ? 'Mic on' : 'Mic off'} ·{' '}
-                    {hasVideo(participant) ? 'Camera on' : 'Camera off'}
-                  </p>
-                </div>
-                {raisedUserIds.includes(participant.userId) && (
-                  <span aria-label="Hand raised">✋</span>
-                )}
-                {participant.isSpeaking && (
-                  <span className="text-xs text-primary">Speaking</span>
-                )}
-              </div>
-              {isHost && participant.userId !== meId && (
-                <div className="ml-12 mt-2 text-xs flex gap-4">
-                  <button
-                    disabled={busy || !hasAudio(participant)}
-                    onClick={() => onMute(participant.userId)}
-                    className="text-primary"
-                  >
-                    Mute
-                  </button>
-                  <button
-                    disabled={busy}
-                    onClick={() => onRemove(participant.userId)}
-                    className="text-meet-red"
-                  >
-                    Remove
-                  </button>
-                </div>
-              )}
-            </li>
-          ))}
-        </ul>
+        <h3 className="people-section-label">In the meeting</h3>
+        <details className="people-contributors" open>
+          <summary>
+            Contributors{' '}
+            <span>
+              {participants.length + participants.filter(hasScreenShare).length}
+            </span>
+          </summary>
+          <ul className="space-y-5">
+            {ordered
+              .filter((participant) =>
+                (participant.name || participant.userId)
+                  .toLocaleLowerCase()
+                  .includes(search.trim().toLocaleLowerCase()),
+              )
+              .map((participant) => (
+                <li key={participant.sessionId}>
+                  <div className="flex gap-3 items-center">
+                    <Avatar participant={participant} width={36} />
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-medium truncate">
+                        {participant.name || participant.userId}
+                        {participant.userId === meId ? ' (You)' : ''}
+                      </p>
+                      <p className="text-xs text-meet-gray mt-1">
+                        {participant.userId === hostId ? 'Host · ' : ''}
+                        {hasScreenShare(participant) ? 'Presenting · ' : ''}
+                        {hasAudio(participant) ? 'Mic on' : 'Mic off'} ·{' '}
+                        {hasVideo(participant) ? 'Camera on' : 'Camera off'}
+                      </p>
+                    </div>
+                    {raisedUserIds.includes(participant.userId) && (
+                      <span aria-label="Hand raised">✋</span>
+                    )}
+                    {participant.isSpeaking && (
+                      <span className="text-xs text-primary">Speaking</span>
+                    )}
+                  </div>
+                  {isHost && participant.userId !== meId && (
+                    <div className="ml-12 mt-2 text-xs flex gap-4">
+                      <button
+                        disabled={busy || !hasAudio(participant)}
+                        onClick={() => onMute(participant.userId)}
+                        className="text-primary"
+                      >
+                        Mute
+                      </button>
+                      <button
+                        disabled={busy}
+                        onClick={() => onRemove(participant.userId)}
+                        className="text-meet-red"
+                      >
+                        Remove
+                      </button>
+                    </div>
+                  )}
+                  {hasScreenShare(participant) && (
+                    <div className="people-presentation-row">
+                      <PresentToAll />
+                      <div>
+                        <p>{participant.name || participant.userId}</p>
+                        <small>
+                          {participant.userId === meId
+                            ? 'Your presentation'
+                            : 'Presentation'}
+                        </small>
+                      </div>
+                    </div>
+                  )}
+                </li>
+              ))}
+          </ul>
+          {!ordered.some((participant) =>
+            (participant.name || participant.userId)
+              .toLocaleLowerCase()
+              .includes(search.trim().toLocaleLowerCase()),
+          ) && (
+            <p role="status" className="p-4 text-sm">
+              No people match your search.
+            </p>
+          )}
+        </details>
       </section>
     </div>
   );

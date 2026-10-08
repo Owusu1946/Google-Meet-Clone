@@ -25,7 +25,7 @@ export default function SidePanel({
       onKeyDown={(event) => {
         if (event.key === 'Escape') onClose();
       }}
-      className="meeting-panel"
+      className={`meeting-panel ${title === 'People' ? 'people-panel' : ''}`}
     >
       <header className="p-5 flex items-center justify-between border-b border-hairline-gray">
         <h2 className="text-xl">{title}</h2>

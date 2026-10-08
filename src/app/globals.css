@@ -1639,3 +1639,422 @@ input:focus-visible {
     gap: 6px;
   }
 }
+/* People preview and full participant panel. */
+.people-summary {
+  position: relative;
+}
+.people-summary-avatars {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  min-width: 28px;
+}
+.people-summary-popover {
+  position: absolute;
+  right: 0;
+  top: 100%;
+  padding: 24px;
+  width: min(360px, calc(100vw - 32px));
+  background: #282b2d;
+  color: #e3e3e3;
+  border-radius: 24px;
+  box-shadow: 0 8px 30px #0003;
+}
+.people-summary-popover h2 {
+  font-size: 20px;
+  margin-bottom: 24px;
+}
+.people-summary-card {
+  background: #343739;
+  border-radius: 16px;
+  padding: 16px;
+}
+.people-summary-card p {
+  color: #bdc1c6;
+  font-size: 14px;
+  overflow-wrap: anywhere;
+  margin-top: 4px;
+}
+.people-summary-popover > button {
+  color: #a8c7fa;
+  padding: 20px 8px 0;
+  width: 100%;
+}
+.people-summary-popover > button span {
+  margin-left: 12px;
+}
+.people-panel {
+  background: #202124;
+  color: #e3e3e3;
+  border-radius: 24px;
+}
+.people-panel > header {
+  border: 0;
+}
+.people-panel > header button:hover {
+  background: #343739;
+}
+.people-panel .text-meet-gray {
+  color: #bdc1c6;
+}
+.people-panel .text-primary {
+  color: #a8c7fa;
+}
+.people-panel .text-meet-red {
+  color: #ffb4ab;
+}
+.people-panel .bg-blue-50 {
+  background: #303438;
+}
+.people-search {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  border: 1px solid #80868b;
+  border-radius: 10px;
+  padding: 12px;
+}
+.people-search > span {
+  font-size: 28px;
+  line-height: 1;
+}
+.people-search input {
+  min-width: 0;
+  width: 100%;
+  background: transparent;
+  color: inherit;
+}
+.people-search input::placeholder {
+  color: #bdc1c6;
+}
+.people-section-label {
+  text-transform: uppercase;
+  font-size: 12px;
+  color: #9aa0a6;
+  margin-bottom: 16px;
+}
+.people-contributors {
+  border: 1px solid #45494c;
+  border-radius: 16px;
+}
+.people-contributors summary {
+  padding: 14px 16px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 500;
+}
+.people-contributors summary span {
+  float: right;
+}
+.people-contributors[open] summary {
+  border-bottom: 1px solid #45494c;
+}
+.people-contributors ul {
+  padding: 20px 16px;
+}
+@media (max-width: 600px) {
+  .meeting-topbar:has(.admission-trigger) .people-summary-avatars {
+    display: none;
+  }
+  .people-summary-popover {
+    position: fixed;
+    top: 56px;
+    right: 16px;
+  }
+}
+.presentation-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) clamp(160px, 25%, 330px);
+  gap: 16px;
+  height: 100%;
+  min-height: 0;
+}
+.presentation-screen {
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  border-radius: 20px;
+  background: #111315;
+}
+.root-theme .presentation-screen > .str-video__participant-view {
+  width: 100%;
+  height: 100%;
+  max-width: none;
+  aspect-ratio: unset;
+  background: transparent;
+}
+.root-theme .presentation-screen video {
+  object-fit: contain !important;
+}
+.presentation-participants {
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.presentation-participant {
+  flex: 1 0 140px;
+  min-height: 140px;
+  max-height: 50%;
+  border-radius: 20px;
+  overflow: hidden;
+}
+.root-theme .presentation-participant > .str-video__participant-view {
+  width: 100%;
+  height: 100%;
+  max-width: none;
+  aspect-ratio: unset;
+}
+.presentation-status {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 10px;
+  background: #282b2d;
+  border-radius: 30px;
+  padding: 4px 4px 4px 12px;
+  font-size: 14px;
+}
+.presentation-status > svg {
+  fill: currentColor;
+  flex-shrink: 0;
+}
+.presentation-status > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 240px;
+}
+.presentation-status button {
+  background: #a8c7fa;
+  color: #062e6f;
+  padding: 8px 14px;
+  border-radius: 30px;
+  flex-shrink: 0;
+}
+.presentation-status button:disabled {
+  opacity: 0.5;
+}
+@media (max-width: 900px) {
+  .presentation-status > span {
+    max-width: 120px;
+  }
+  .presentation-status {
+    font-size: 12px;
+    gap: 6px;
+  }
+}
+@media (max-width: 600px) {
+  .meeting-topbar:has(.presentation-status) {
+    flex-wrap: wrap;
+  }
+  .meeting-topbar:has(.presentation-status) .meeting-topbar-people {
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    width: 100%;
+  }
+  .presentation-status {
+    margin-right: auto;
+    max-width: calc(100% - 76px);
+  }
+  .presentation-layout {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: minmax(0, 1fr) 100px;
+    gap: 8px;
+  }
+  .presentation-participants {
+    flex-direction: row;
+    overflow-x: auto;
+    overflow-y: hidden;
+  }
+  .presentation-participant {
+    flex: 0 0 140px;
+    min-height: 0;
+    max-height: none;
+    border-radius: 12px;
+  }
+}
+.presenter-pip-placeholder {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  gap: 20px;
+  padding: 24px;
+  background: #202124;
+  border-radius: 24px;
+}
+.presenter-pip-placeholder > svg {
+  fill: #a8c7fa;
+  width: 64px;
+  height: 64px;
+}
+.presenter-pip-placeholder h2 {
+  font-size: clamp(20px, 2vw, 30px);
+}
+.presenter-pip-placeholder p {
+  color: #bdc1c6;
+}
+.presenter-pip-placeholder button {
+  color: #a8c7fa;
+  padding: 12px;
+}
+.presentation-pip-error {
+  position: fixed;
+  top: 80px;
+  right: 16px;
+  padding: 16px;
+  max-width: min(400px, calc(100vw - 32px));
+  background: #3c2525;
+  color: #ffb4ab;
+  border-radius: 16px;
+  z-index: 80;
+  white-space: normal !important;
+}
+.presenter-pip-theme {
+  height: 100%;
+  background: #111315;
+  color: #e3e3e3;
+}
+.presenter-pip {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  padding: 12px;
+  gap: 12px;
+}
+.presenter-pip > header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  flex-shrink: 0;
+}
+.presenter-pip > header svg {
+  fill: #a8c7fa;
+}
+.presenter-pip > header button {
+  margin-left: auto;
+  color: #a8c7fa;
+  padding: 8px;
+}
+.presenter-pip-participants {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-auto-rows: minmax(140px, 1fr);
+  overflow-y: auto;
+  gap: 8px;
+}
+.presenter-pip-participants > div {
+  min-height: 0;
+  border-radius: 16px;
+  overflow: hidden;
+}
+.root-theme .presenter-pip-participants .str-video__participant-view {
+  height: 100%;
+  width: 100%;
+  max-width: none;
+  aspect-ratio: unset;
+}
+.presenter-pip-controls {
+  display: flex;
+  justify-content: center;
+  gap: 12px;
+  flex-shrink: 0;
+}
+.presenter-pip-controls button {
+  display: grid;
+  place-items: center;
+  background: #303438;
+  color: white;
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+}
+.presenter-pip-controls svg {
+  fill: currentColor;
+}
+.presenter-pip-controls button[aria-pressed='false'],
+.presenter-pip-controls .presenter-pip-leave {
+  background: #b3261e;
+}
+.presenter-pip-controls button:disabled {
+  opacity: 0.5;
+}
+.presenter-pip-error {
+  color: #ffb4ab;
+  font-size: 12px;
+}
+@media (max-width: 900px) {
+  .meeting-topbar:has(.presentation-status) {
+    flex-wrap: wrap;
+  }
+  .meeting-topbar:has(.presentation-status) .meeting-topbar-people {
+    width: 100%;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+  }
+  .presentation-status {
+    margin-right: auto;
+    flex-wrap: wrap;
+  }
+}
+@media (max-width: 600px) {
+  .presentation-status:has(button) > span {
+    display: none;
+  }
+  .presentation-status button {
+    padding: 8px;
+    font-size: 11px;
+  }
+  .presentation-status {
+    gap: 4px;
+  }
+}
+.presenter-pip-screen {
+  flex: 0 1 160px;
+  min-height: 60px;
+  border-radius: 12px;
+  overflow: hidden;
+}
+.root-theme .presenter-pip-screen .str-video__participant-view {
+  width: 100%;
+  height: 100%;
+  max-width: none;
+  aspect-ratio: unset;
+  background: transparent;
+}
+.root-theme .presenter-pip-screen video {
+  object-fit: contain !important;
+}
+.people-presentation-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 16px 0 0 12px;
+  font-size: 14px;
+}
+.people-presentation-row svg {
+  fill: #a8c7fa;
+  flex-shrink: 0;
+}
+.people-presentation-row small {
+  color: #bdc1c6;
+  font-size: 12px;
+}
+@media (max-height: 400px) and (display-mode: picture-in-picture) {
+  .presenter-pip-screen {
+    display: none;
+  }
+  .presenter-pip-participants {
+    grid-auto-rows: minmax(80px, 1fr);
+  }
+}
