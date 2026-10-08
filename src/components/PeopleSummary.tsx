@@ -34,12 +34,15 @@ export default function PeopleSummary() {
           room.togglePanel('people');
         }}
       >
-        <span className="people-summary-avatars" aria-hidden="true">
-          {preview.slice(0, 3).map((participant) => (
+        <span
+          className={`people-summary-avatars ${preview.length === 1 ? 'single' : ''}`}
+          aria-hidden="true"
+        >
+          {preview.map((participant) => (
             <Avatar
               key={participant.sessionId}
               participant={participant}
-              width={22}
+              width={preview.length === 1 ? 28 : 14}
             />
           ))}
         </span>
@@ -63,7 +66,8 @@ export default function PeopleSummary() {
                   }}
                 >
                   {' '}
-                  and {room.participants.length - 4} others
+                  and {room.participants.length - 4}{' '}
+                  {room.participants.length === 5 ? 'other' : 'others'}
                 </button>
               )}
             </p>

@@ -2164,3 +2164,20 @@ input:focus-visible {
   text-decoration: underline;
   border-radius: 4px;
 }
+.people-summary-avatars {
+  display: grid;
+  grid-template-columns: repeat(2, 14px);
+  gap: 2px;
+  align-content: center;
+  min-width: 30px;
+  min-height: 30px;
+}
+.people-summary-avatars .avatar > div {
+  font-size: 9px;
+}
+.people-summary-avatars.single {
+  grid-template-columns: 28px;
+}
+.people-summary-avatars.single .avatar > div {
+  font-size: 14px;
+}
