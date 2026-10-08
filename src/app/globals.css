@@ -1074,17 +1074,20 @@ input:focus-visible {
 .is-waiting .lobby-preview-controls {
   position: fixed;
   bottom: 26px;
-  left: calc(50% - 140px);
+  left: 50%;
+  transform: translateX(-50%);
+  width: 312px;
   right: auto;
   gap: 12px;
-  padding: 12px 140px 12px 12px;
+  justify-content: flex-start;
+  padding: 12px;
   background: #202124;
   border-radius: 48px;
 }
 .is-waiting .lobby-effects-button {
   position: fixed;
   bottom: 38px;
-  left: calc(50% + 16px);
+  left: 50%;
   right: auto;
   width: 60px;
   height: 60px;
@@ -1094,7 +1097,7 @@ input:focus-visible {
 .waiting-leave {
   position: fixed;
   bottom: 38px;
-  left: calc(50% + 88px);
+  left: calc(50% + 72px);
   width: 72px;
   height: 60px;
   display: grid;
@@ -1124,6 +1127,23 @@ input:focus-visible {
   color: #ffb4ab;
 }
 @media (max-width: 600px) {
+  .is-waiting .lobby-preview-controls {
+    width: 296px;
+    gap: 8px;
+  }
+  .is-waiting .lobby-media-button,
+  .is-waiting .lobby-effects-button {
+    width: 56px;
+    height: 56px;
+  }
+  .is-waiting .lobby-effects-button {
+    left: calc(50% - 8px);
+  }
+  .waiting-leave {
+    left: calc(50% + 56px);
+    width: 80px;
+    height: 56px;
+  }
   .waiting-room-message {
     padding-bottom: 220px;
   }

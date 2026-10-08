@@ -169,6 +169,28 @@ try {
   );
   const queue = await request(`${path}/host`, host);
   assert.equal(queue.requests[0]?.id, applicant);
+  // Cancellation only applies to the authenticated applicant, never a body ID.
+  await request(`${path}/access`, outsider, {
+    cancel: true,
+    userId: applicant,
+  });
+  assert.equal(
+    (await request(`${path}/host`, host)).requests[0]?.id,
+    applicant,
+  );
+  assert.equal(
+    (await request(`${path}/access`, applicant, { cancel: true })).status,
+    'request',
+  );
+  assert.equal((await request(`${path}/host`, host)).requests.length, 0);
+  assert.equal(
+    (await request(`${path}/access`, applicant, { ask: true })).status,
+    'waiting',
+  );
+  assert.equal(
+    (await request(`${path}/host`, host)).requests[0]?.id,
+    applicant,
+  );
   await request(`${path}/host`, host, { action: 'admit', userId: applicant });
   assert.equal(
     (await request(`${path}/access`, applicant, {})).status,
