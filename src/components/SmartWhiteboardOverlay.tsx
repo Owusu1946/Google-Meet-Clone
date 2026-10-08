@@ -76,6 +76,7 @@ export default function SmartWhiteboardOverlay({
   open: boolean;
   onClose: () => void;
 }) {
+  const [toolsOpen, setToolsOpen] = useState(false);
   const { access } = useMeeting();
   const { useCallCustomData } = useCallStateHooks();
   const custom = useCallCustomData();
@@ -378,214 +379,248 @@ export default function SmartWhiteboardOverlay({
       },
     });
   };
+  useEffect(() => {
+    setToolsOpen(false);
+  }, [tool, open]);
   if (!open) return null;
   return (
     <section className="whiteboard" aria-label="Shared whiteboard">
-      <header className="p-3 flex flex-wrap gap-2 items-center bg-white border-b border-hairline-gray">
+      <header className="board-header p-3 flex gap-2 items-center bg-white border-b border-hairline-gray">
         <span className="text-sm font-medium mr-2">Whiteboard</span>
-        {(
-          ['select', 'pen', 'highlighter', 'eraser', 'pan', 'connect'] as const
-        ).map((value) => (
-          <button
-            key={value}
-            aria-pressed={tool === value}
-            disabled={value !== 'pan' && !canDraw}
-            className={`board-tool ${tool === value ? 'bg-blue-50 text-primary' : ''}`}
-            onClick={() => setTool(value)}
-          >
-            {value === 'pan' ? 'Move' : value[0].toUpperCase() + value.slice(1)}
-          </button>
-        ))}
-        <select
-          className="board-tool"
-          aria-label="Add to workspace"
-          value={OBJECT_TYPES.includes(tool as ObjectType) ? tool : ''}
-          disabled={!canDraw}
-          onChange={(event) => setTool(event.target.value as Tool)}
+        <button
+          className="board-tool board-tools-toggle"
+          aria-expanded={toolsOpen}
+          aria-controls="whiteboard-tools"
+          onClick={() => setToolsOpen((value) => !value)}
         >
-          <option value="" disabled>
-            Add object...
-          </option>
-          {OBJECT_TYPES.filter((value) => value !== 'connector').map(
-            (value) => (
-              <option key={value} value={value}>
-                {value[0].toUpperCase() + value.slice(1)}
-              </option>
-            ),
-          )}
-        </select>
-        <select
-          className="board-tool"
-          aria-label="Insert workspace template"
-          value=""
-          disabled={!canDraw}
-          onChange={(event) => {
-            const name = WORKSPACE_TEMPLATES.find(
-              (value) => value === event.target.value,
-            );
-            if (name) {
-              const point = viewToWorld(
-                { x: 40, y: 40 },
-                transform.scale,
-                transform.offset,
-              );
-              workspace.template(name, point.x, point.y);
-              setTool('select');
+          Tools · {tool === 'pan' ? 'Move' : tool}
+        </button>
+        <div
+          id="whiteboard-tools"
+          className="board-tools-panel"
+          data-open={toolsOpen}
+          onKeyDown={(event) => {
+            if (event.key === 'Escape') {
+              event.stopPropagation();
+              setToolsOpen(false);
             }
           }}
         >
-          <option value="" disabled>
-            Templates...
-          </option>
-          {WORKSPACE_TEMPLATES.map((name) => (
-            <option key={name}>{name}</option>
+          {(
+            [
+              'select',
+              'pen',
+              'highlighter',
+              'eraser',
+              'pan',
+              'connect',
+            ] as const
+          ).map((value) => (
+            <button
+              key={value}
+              aria-pressed={tool === value}
+              disabled={value !== 'pan' && !canDraw}
+              className={`board-tool ${tool === value ? 'bg-blue-50 text-primary' : ''}`}
+              onClick={() => setTool(value)}
+            >
+              {value === 'pan'
+                ? 'Move'
+                : value[0].toUpperCase() + value.slice(1)}
+            </button>
           ))}
-        </select>
-        <input
-          aria-label="Drawing color"
-          type="color"
-          value={color}
-          onChange={(event) => setColor(event.target.value)}
-          className="w-8 h-8"
-          disabled={!canDraw}
-        />
-        <label className="flex items-center gap-2 text-xs">
-          Size
+          <select
+            className="board-tool"
+            aria-label="Add to workspace"
+            value={OBJECT_TYPES.includes(tool as ObjectType) ? tool : ''}
+            disabled={!canDraw}
+            onChange={(event) => setTool(event.target.value as Tool)}
+          >
+            <option value="" disabled>
+              Add object...
+            </option>
+            {OBJECT_TYPES.filter((value) => value !== 'connector').map(
+              (value) => (
+                <option key={value} value={value}>
+                  {value[0].toUpperCase() + value.slice(1)}
+                </option>
+              ),
+            )}
+          </select>
+          <select
+            className="board-tool"
+            aria-label="Insert workspace template"
+            value=""
+            disabled={!canDraw}
+            onChange={(event) => {
+              const name = WORKSPACE_TEMPLATES.find(
+                (value) => value === event.target.value,
+              );
+              if (name) {
+                const point = viewToWorld(
+                  { x: 40, y: 40 },
+                  transform.scale,
+                  transform.offset,
+                );
+                workspace.template(name, point.x, point.y);
+                setTool('select');
+              }
+            }}
+          >
+            <option value="" disabled>
+              Templates...
+            </option>
+            {WORKSPACE_TEMPLATES.map((name) => (
+              <option key={name}>{name}</option>
+            ))}
+          </select>
           <input
-            aria-label="Brush size"
-            type="range"
-            min={1}
-            max={12}
-            value={width}
-            onChange={(event) => setWidth(Number(event.target.value))}
-            className="w-20"
+            aria-label="Drawing color"
+            type="color"
+            value={color}
+            onChange={(event) => setColor(event.target.value)}
+            className="w-8 h-8"
             disabled={!canDraw}
           />
-        </label>
-        <button
-          className="board-tool"
-          disabled={
-            !canDraw || (tool === 'select' ? !workspace.canUndo : !lastOwn)
-          }
-          onClick={() =>
-            tool === 'select'
-              ? workspace.undo()
-              : lastOwn &&
-                send({
-                  kind: 'visibility',
-                  strokeId: lastOwn.id,
-                  visible: false,
-                })
-          }
-        >
-          Undo
-        </button>
-        <button
-          className="board-tool"
-          disabled={
-            !canDraw || (tool === 'select' ? !workspace.canRedo : !lastHidden)
-          }
-          onClick={() =>
-            tool === 'select'
-              ? workspace.redo()
-              : lastHidden &&
-                send({
-                  kind: 'visibility',
-                  strokeId: lastHidden.id,
-                  visible: true,
-                })
-          }
-        >
-          Redo
-        </button>
-        {access.isHost && (
-          <button className="board-tool" onClick={() => setClearPrompt(true)}>
-            Clear
-          </button>
-        )}
-        <select
-          className="board-tool"
-          aria-label="Export workspace"
-          value=""
-          onChange={(event) => void exportBoard(event.target.value)}
-        >
-          <option value="" disabled>
-            Export...
-          </option>
-          <option value="png">PNG image</option>
-          <option value="svg">SVG vector</option>
-          <option value="json">Editable workspace</option>
-        </select>
-        <button
-          className="board-tool"
-          disabled={!canDraw}
-          onClick={() => importFile.current?.click()}
-        >
-          Import
-        </button>
-        <input
-          ref={importFile}
-          type="file"
-          accept=".json,application/json"
-          className="hidden"
-          aria-label="Import workspace file"
-          onChange={async (event) => {
-            const file = event.target.files?.[0];
-            event.target.value = '';
-            if (!file) return;
-            setFileError('');
-            try {
-              if (file.size > 2_000_000)
-                throw new Error('Workspace files must be under 2 MB.');
-              const snapshot = parseWorkspaceSnapshot(
-                await file.text(),
-                access.identity.id,
-              );
-              if (!workspace.createObjects(snapshot.objects, snapshot.strokes))
-                throw new Error(
-                  'The workspace could not be imported. Check editing access and retry.',
-                );
-              setTool('select');
-            } catch (failure) {
-              setFileError(
-                failure instanceof Error ? failure.message : 'Import failed.',
-              );
+          <label className="flex items-center gap-2 text-xs">
+            Size
+            <input
+              aria-label="Brush size"
+              type="range"
+              min={1}
+              max={12}
+              value={width}
+              onChange={(event) => setWidth(Number(event.target.value))}
+              className="w-20"
+              disabled={!canDraw}
+            />
+          </label>
+          <button
+            className="board-tool"
+            disabled={
+              !canDraw || (tool === 'select' ? !workspace.canUndo : !lastOwn)
             }
-          }}
-        />
-        <button className="board-tool" onClick={fit}>
-          Fit all
-        </button>
-        <button
-          className="board-tool"
-          aria-label="Zoom out"
-          onClick={() =>
-            setTransform((value) => ({
-              ...value,
-              scale: Math.max(0.05, value.scale / 1.2),
-            }))
-          }
-        >
-          -
-        </button>
-        <button
-          className="board-tool"
-          aria-label="Zoom in"
-          onClick={() =>
-            setTransform((value) => ({
-              ...value,
-              scale: Math.min(4, value.scale * 1.2),
-            }))
-          }
-        >
-          +
-        </button>
-        <button
-          className="board-tool"
-          onClick={() => setTransform({ scale: 1, offset: { x: 0, y: 0 } })}
-        >
-          {Math.round(transform.scale * 100)}% · Reset
-        </button>
+            onClick={() =>
+              tool === 'select'
+                ? workspace.undo()
+                : lastOwn &&
+                  send({
+                    kind: 'visibility',
+                    strokeId: lastOwn.id,
+                    visible: false,
+                  })
+            }
+          >
+            Undo
+          </button>
+          <button
+            className="board-tool"
+            disabled={
+              !canDraw || (tool === 'select' ? !workspace.canRedo : !lastHidden)
+            }
+            onClick={() =>
+              tool === 'select'
+                ? workspace.redo()
+                : lastHidden &&
+                  send({
+                    kind: 'visibility',
+                    strokeId: lastHidden.id,
+                    visible: true,
+                  })
+            }
+          >
+            Redo
+          </button>
+          {access.isHost && (
+            <button className="board-tool" onClick={() => setClearPrompt(true)}>
+              Clear
+            </button>
+          )}
+          <select
+            className="board-tool"
+            aria-label="Export workspace"
+            value=""
+            onChange={(event) => void exportBoard(event.target.value)}
+          >
+            <option value="" disabled>
+              Export...
+            </option>
+            <option value="png">PNG image</option>
+            <option value="svg">SVG vector</option>
+            <option value="json">Editable workspace</option>
+          </select>
+          <button
+            className="board-tool"
+            disabled={!canDraw}
+            onClick={() => importFile.current?.click()}
+          >
+            Import
+          </button>
+          <input
+            ref={importFile}
+            type="file"
+            accept=".json,application/json"
+            className="hidden"
+            aria-label="Import workspace file"
+            onChange={async (event) => {
+              const file = event.target.files?.[0];
+              event.target.value = '';
+              if (!file) return;
+              setFileError('');
+              try {
+                if (file.size > 2_000_000)
+                  throw new Error('Workspace files must be under 2 MB.');
+                const snapshot = parseWorkspaceSnapshot(
+                  await file.text(),
+                  access.identity.id,
+                );
+                if (
+                  !workspace.createObjects(snapshot.objects, snapshot.strokes)
+                )
+                  throw new Error(
+                    'The workspace could not be imported. Check editing access and retry.',
+                  );
+                setTool('select');
+              } catch (failure) {
+                setFileError(
+                  failure instanceof Error ? failure.message : 'Import failed.',
+                );
+              }
+            }}
+          />
+          <button className="board-tool" onClick={fit}>
+            Fit all
+          </button>
+          <button
+            className="board-tool"
+            aria-label="Zoom out"
+            onClick={() =>
+              setTransform((value) => ({
+                ...value,
+                scale: Math.max(0.05, value.scale / 1.2),
+              }))
+            }
+          >
+            -
+          </button>
+          <button
+            className="board-tool"
+            aria-label="Zoom in"
+            onClick={() =>
+              setTransform((value) => ({
+                ...value,
+                scale: Math.min(4, value.scale * 1.2),
+              }))
+            }
+          >
+            +
+          </button>
+          <button
+            className="board-tool"
+            onClick={() => setTransform({ scale: 1, offset: { x: 0, y: 0 } })}
+          >
+            {Math.round(transform.scale * 100)}% · Reset
+          </button>
+        </div>
         {(!custom.boardPresenting || access.isHost) && (
           <button
             disabled={room.busy}
@@ -723,7 +758,7 @@ export default function SmartWhiteboardOverlay({
           onTool={setTool}
         />
       </div>
-      <footer className="px-4 py-2 text-xs bg-light-gray flex justify-between gap-3">
+      <footer className="board-footer px-4 py-2 text-xs bg-light-gray flex justify-between gap-3">
         <span role={fileError ? 'alert' : undefined}>
           {fileError ||
             (loading

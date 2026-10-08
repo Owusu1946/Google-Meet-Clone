@@ -2436,3 +2436,62 @@ input:focus-visible {
   padding: 3px 6px;
   background: white;
 }
+
+/* Respond to board width, including split-screen and participant sidebars. */
+.whiteboard {
+  container-type: inline-size;
+}
+.board-header {
+  position: relative;
+  z-index: 30;
+  flex-wrap: wrap;
+  flex-shrink: 0;
+}
+.board-tools-toggle {
+  display: none;
+}
+.board-tools-panel {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+}
+@container (max-width: 1100px) {
+  .board-header {
+    flex-wrap: nowrap;
+    padding: 8px;
+  }
+  .board-header > span {
+    font-size: 12px;
+    margin-right: 0;
+  }
+  .board-tools-toggle {
+    display: inline-flex;
+    white-space: nowrap;
+  }
+  .board-tools-panel {
+    display: none;
+  }
+  .board-tools-panel[data-open='true'] {
+    display: flex;
+    position: absolute;
+    top: 100%;
+    left: 8px;
+    right: 8px;
+    max-height: min(45vh, 320px);
+    overflow-y: auto;
+    padding: 12px;
+    background: white;
+    border: 1px solid #dadce0;
+    border-radius: 12px;
+    box-shadow: 0 8px 24px #0003;
+  }
+  .board-footer > span:first-child {
+    display: none;
+  }
+  .board-footer {
+    justify-content: flex-end;
+    padding: 4px 12px;
+  }
+}
