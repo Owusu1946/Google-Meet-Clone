@@ -8,6 +8,7 @@ import { RaisedHandsProvider } from '@/contexts/RaisedHandsContext';
 import GridLayout from '@/components/GridLayout';
 import FocusLayout from '@/components/FocusLayout';
 import MeetingTopbar from '@/components/MeetingTopbar';
+import MeetingWelcomeCard from '@/components/MeetingWelcomeCard';
 import SpeakerLayout from '@/components/SpeakerLayout';
 import CaptionsOverlay from '@/components/CaptionsOverlay';
 import SmartWhiteboardOverlay from '@/components/SmartWhiteboardOverlay';
@@ -123,6 +124,7 @@ function MeetingRoom() {
             )}
           </div>
           <MeetingPanels />
+          <MeetingWelcomeCard />
         </main>
         <MeetingToolbar />
         {error && (

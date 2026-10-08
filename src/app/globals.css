@@ -1308,3 +1308,86 @@ input:focus-visible {
     width: 56px !important;
   }
 }
+
+.meeting-welcome {
+  position: absolute;
+  left: 24px;
+  bottom: 12px;
+  z-index: 12;
+  width: min(380px, calc(100% - 48px));
+  background: white;
+  color: #3c4043;
+  padding: 24px;
+  border-radius: 12px;
+  box-shadow: 0 4px 24px #0004;
+}
+.meeting-welcome-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 28px;
+}
+.meeting-welcome-heading h2 {
+  font-size: 20px;
+  font-weight: 500;
+}
+.meeting-welcome-heading button {
+  padding: 4px;
+  border-radius: 50%;
+  color: #5f6368;
+}
+.meeting-add-others {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 14px;
+  background: #0b57d0;
+}
+.meeting-add-others svg {
+  fill: white;
+}
+.meeting-welcome > p {
+  font-size: 15px;
+  line-height: 1.5;
+  margin-bottom: 14px;
+}
+.meeting-welcome-policy {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  margin: 16px 0 24px;
+  font-size: 13px;
+  color: #70757a;
+  line-height: 1.5;
+}
+.meeting-welcome-policy > span {
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: #e8f0fe;
+  color: #1a73e8;
+  flex-shrink: 0;
+  width: 28px;
+  height: 28px;
+  font-size: 20px;
+}
+.meeting-welcome .meeting-welcome-identity {
+  margin-bottom: 0;
+  font-size: 12px;
+  color: #70757a;
+  overflow-wrap: anywhere;
+}
+@media (max-width: 767px) {
+  .meeting-welcome {
+    left: 12px;
+    bottom: 12px;
+    width: min(360px, calc(100% - 24px));
+    max-height: 60svh;
+    overflow-y: auto;
+    padding: 20px;
+  }
+  .meeting-welcome-heading {
+    margin-bottom: 20px;
+  }
+}
