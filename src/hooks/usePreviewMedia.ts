@@ -99,7 +99,6 @@ export default function usePreviewMedia() {
     };
     stop();
     setStream(undefined);
-    setError('');
     const start = async () => {
       if (!navigator.mediaDevices)
         throw new Error(
@@ -170,7 +169,10 @@ export default function usePreviewMedia() {
       active.current = next;
       setStream(next);
       setBusy(false);
-      setDevices(await navigator.mediaDevices.enumerateDevices());
+      const available = await navigator.mediaDevices
+        .enumerateDevices()
+        .catch(() => []);
+      if (!cancelled) setDevices(available);
     };
     void start().catch((failure) => {
       if (!cancelled) {
@@ -200,6 +202,7 @@ export default function usePreviewMedia() {
     [],
   );
   const requestDevices = (next: Partial<DevicePreferences>) => {
+    setError('');
     change(next);
     setAttempt((value) => value + 1);
   };

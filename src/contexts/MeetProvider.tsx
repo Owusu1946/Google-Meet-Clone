@@ -23,7 +23,10 @@ import {
   errorMessage,
   type MeetingAccess,
 } from '@/lib/meeting';
-import { readDevicePreferences } from '@/hooks/usePreviewMedia';
+import {
+  readDevicePreferences,
+  type DevicePreferences,
+} from '@/hooks/usePreviewMedia';
 import LoadingOverlay from '@/components/LoadingOverlay';
 
 export { CALL_TYPE } from '@/lib/meeting';
@@ -52,6 +55,8 @@ export default function MeetProvider({
   const router = useRouter();
   const { isLoaded, user } = useUser();
   const [attempt, setAttempt] = useState(0);
+  const [initialBlur, setInitialBlur] =
+    useState<DevicePreferences['blur']>('none');
   const [session, setSession] = useState<Session>();
   const [video, setVideo] = useState<StreamVideoClient>();
   const [activeCall, setActiveCall] =
@@ -102,6 +107,7 @@ export default function MeetProvider({
       if (cancelled) return;
       // Device preferences survive lobby navigation and reload; denied devices do not block joining.
       const settings = readDevicePreferences();
+      setInitialBlur(settings.blur || 'none');
       const devices = [
         async () => {
           if (settings.audioId) await call!.microphone.select(settings.audioId);
@@ -207,6 +213,12 @@ export default function MeetProvider({
       <StreamVideo client={video}>
         <StreamCall call={activeCall}>
           <BackgroundFiltersProvider
+            backgroundFilter={
+              initialBlur && initialBlur !== 'none' ? 'blur' : undefined
+            }
+            backgroundBlurLevel={
+              initialBlur && initialBlur !== 'none' ? initialBlur : 'high'
+            }
             onError={(failure) =>
               setSession((current) =>
                 current

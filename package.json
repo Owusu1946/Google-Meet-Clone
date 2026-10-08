@@ -19,6 +19,7 @@
     "@clerk/nextjs": "6.39.7",
     "@stream-io/node-sdk": "0.4.26",
     "@stream-io/video-client": "1.61.1",
+    "@stream-io/video-filters-web": "0.10.0",
     "@stream-io/video-react-sdk": "1.43.3",
     "clsx": "2.1.1",
     "gsap": "3.15.0",

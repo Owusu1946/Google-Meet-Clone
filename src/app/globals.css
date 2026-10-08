@@ -555,3 +555,440 @@ input:focus-visible {
   grid-column: 3;
   justify-self: end;
 }
+
+/* Prejoin and permission surfaces. */
+.lobby-layout {
+  max-width: 1680px;
+  margin: auto;
+  min-height: calc(100svh - 90px);
+  padding: 48px clamp(20px, 3vw, 64px);
+  display: grid;
+  grid-template-columns: minmax(0, 1.8fr) minmax(280px, 0.9fr);
+  gap: clamp(32px, 5vw, 100px);
+  align-items: center;
+}
+.lobby-preview {
+  min-width: 0;
+}
+.lobby-preview-stage {
+  position: relative;
+  aspect-ratio: 16 / 9;
+  border-radius: 24px;
+  background: linear-gradient(#0d0e0f, #202124 25%, #202124 75%, #0d0e0f);
+  color: white;
+  overflow: hidden;
+}
+.lobby-preview-name {
+  position: absolute;
+  top: 24px;
+  left: 24px;
+  z-index: 2;
+  font-weight: 500;
+}
+.lobby-preview-video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transform: scaleX(-1);
+}
+.lobby-preview-message {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 24px;
+  text-align: center;
+  padding: 60px 24px 100px;
+}
+.lobby-preview-message h2 {
+  font-size: clamp(18px, 1.7vw, 28px);
+  font-weight: 400;
+  max-width: 680px;
+  line-height: 1.4;
+}
+.lobby-allow {
+  background: #1a73e8;
+  border-radius: 5px;
+  padding: 12px 24px;
+  font-weight: 500;
+  font-size: 16px;
+}
+.lobby-preview-controls {
+  position: absolute;
+  bottom: 24px;
+  left: 0;
+  right: 0;
+  display: flex;
+  justify-content: center;
+  gap: 16px;
+}
+.lobby-media-button {
+  position: relative;
+  width: 60px;
+  height: 60px;
+  border-radius: 50%;
+  background: #e0e5eb;
+  color: #202124;
+  display: grid;
+  place-items: center;
+}
+.lobby-media-button svg {
+  fill: currentColor;
+}
+.lobby-media-button.enabled {
+  background: #303438;
+  color: white;
+  border: 1px solid #70757a;
+}
+.lobby-media-button:disabled {
+  opacity: 0.55;
+}
+.device-warning {
+  position: absolute;
+  top: -3px;
+  right: 2px;
+  background: #fbbc04;
+  color: #202124;
+  border-radius: 10px;
+  width: 16px;
+  height: 22px;
+  font-size: 14px;
+  font-weight: 700;
+}
+.lobby-effects-button {
+  position: absolute;
+  bottom: 24px;
+  right: 20px;
+  width: 56px;
+  height: 56px;
+  display: grid;
+  place-items: center;
+  border: 1px solid #dadce0;
+  border-radius: 50%;
+}
+.lobby-device-row {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 24px;
+}
+.lobby-device {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  border: 1px solid #dadce0;
+  border-radius: 24px;
+  padding: 8px 12px;
+  color: #5f6368;
+}
+.lobby-device svg {
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+  fill: currentColor;
+}
+.lobby-device select {
+  min-width: 0;
+  width: 100%;
+  background: transparent;
+  font-size: 13px;
+  text-overflow: ellipsis;
+}
+.lobby-device:has(select:disabled) {
+  opacity: 0.6;
+}
+.lobby-join-panel {
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 24px;
+}
+.lobby-join-panel h1 {
+  font-size: clamp(28px, 2.5vw, 38px);
+  font-weight: 400;
+}
+.lobby-join-panel .primary-button {
+  min-width: 220px;
+  padding: 18px 32px;
+  font-size: 16px;
+}
+.lobby-media-error {
+  color: #b3261e;
+  margin-top: 12px;
+  font-size: 13px;
+}
+.lobby-avatar {
+  width: 100px;
+  height: 100px;
+  background: #006c80;
+  color: white;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  font-size: 42px;
+}
+.permission-dialog {
+  width: min(960px, 94vw);
+  padding: 32px 48px 40px;
+  border-radius: 32px;
+  text-align: center;
+}
+.permission-dialog > div:first-child {
+  margin-bottom: 0;
+  justify-content: flex-end;
+}
+.permission-dialog > div:first-child h2 {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+}
+.permission-illustration {
+  width: min(100%, 430px);
+  height: auto;
+  margin: 0 auto 36px;
+}
+.permission-dialog > h2 {
+  font-size: clamp(22px, 2.2vw, 30px);
+  line-height: 1.4;
+  font-weight: 400;
+}
+.permission-dialog > p {
+  margin: 24px 0 40px;
+  color: #5f6368;
+  font-size: 17px;
+}
+.permission-actions {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 18px;
+  max-width: 560px;
+  margin: auto;
+}
+.permission-primary,
+.permission-secondary {
+  min-height: 54px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  font-size: 16px;
+  padding: 14px 24px;
+  min-width: 280px;
+}
+.permission-primary {
+  background: #0b57d0;
+}
+.permission-secondary {
+  border: 1px solid #1a73e8;
+  color: #1a73e8;
+  border-radius: 30px;
+}
+.permission-actions svg {
+  fill: currentColor;
+}
+.permission-expand {
+  width: 52px;
+  height: 52px;
+  border: 1px solid #747775;
+  border-radius: 50%;
+  font-size: 26px;
+}
+.permission-alternatives {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid #dadce0;
+  border-radius: 16px;
+  width: 100%;
+  padding: 8px;
+}
+.permission-alternatives button {
+  padding: 12px;
+  border-radius: 8px;
+}
+.permission-alternatives button:hover {
+  background: #f1f3f4;
+}
+.permission-dialog > small {
+  display: block;
+  margin-top: 26px;
+  color: #747775;
+  font-size: 12px;
+}
+.effects-dialog {
+  width: min(1440px, 96vw);
+  padding: 28px;
+  border-radius: 32px;
+}
+.effects-dialog > div:first-child h2 {
+  font-size: 28px;
+  font-weight: 400;
+}
+.effects-dialog-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(250px, 1fr);
+  gap: 32px;
+}
+.effects-preview {
+  position: relative;
+  aspect-ratio: 16 / 9;
+  overflow: hidden;
+  border-radius: 24px;
+  background: #202124;
+  color: white;
+}
+.effects-camera-off {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  gap: 16px;
+  text-align: center;
+}
+.effects-status {
+  position: absolute;
+  bottom: 16px;
+  left: 16px;
+  background: #202124;
+  padding: 8px 16px;
+  border-radius: 20px;
+}
+.effects-tab {
+  color: #0b57d0;
+  border-bottom: 3px solid #0b57d0;
+  padding: 12px 0;
+  margin-bottom: 24px;
+  font-weight: 500;
+}
+.blur-options {
+  background: #f0f4f9;
+  border-radius: 24px;
+  padding: 20px;
+  color: #202124;
+}
+.blur-options h3 {
+  font-size: 17px;
+  font-weight: 500;
+}
+.blur-options > p {
+  font-size: 13px;
+  color: #5f6368;
+  margin: 6px 0 20px;
+}
+.blur-choice-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+.blur-choice {
+  min-width: 0;
+  border-radius: 16px;
+  border: 2px solid transparent;
+  padding: 6px;
+  font-size: 11px;
+}
+.blur-choice.selected {
+  border-color: #0b57d0;
+  color: #0b57d0;
+  background: white;
+}
+.blur-choice-art {
+  position: relative;
+  display: grid;
+  place-items: center;
+  aspect-ratio: 1;
+  border-radius: 12px;
+  background: radial-gradient(circle, #aac8ff 1px, #d3e3fd 2px);
+  background-size: 8px 8px;
+  margin-bottom: 8px;
+}
+.blur-choice-art > span {
+  color: #0b57d0;
+  font-size: 34px;
+  line-height: 1;
+}
+.blur-low {
+  background-size: 12px 12px;
+}
+.blur-high {
+  background: #d3e3fd;
+}
+@media (max-width: 900px) {
+  .lobby-layout {
+    grid-template-columns: 1fr;
+    gap: 32px;
+    padding-top: 24px;
+  }
+  .lobby-join-panel {
+    gap: 16px;
+  }
+  .effects-dialog-layout {
+    grid-template-columns: 1fr;
+    gap: 20px;
+  }
+}
+@media (max-width: 520px) {
+  .lobby-layout {
+    padding: 16px;
+  }
+  .lobby-preview-stage {
+    border-radius: 16px;
+    aspect-ratio: 4 / 3;
+  }
+  .lobby-preview-name {
+    top: 16px;
+    left: 16px;
+  }
+  .lobby-preview-message {
+    padding: 48px 16px 90px;
+    gap: 14px;
+  }
+  .lobby-allow {
+    font-size: 13px;
+    padding: 10px;
+  }
+  .lobby-media-button {
+    width: 48px;
+    height: 48px;
+  }
+  .lobby-effects-button {
+    width: 42px;
+    height: 42px;
+    right: 12px;
+  }
+  .lobby-device-row {
+    grid-template-columns: 1fr;
+    gap: 8px;
+    margin-top: 12px;
+  }
+  .permission-dialog {
+    padding: 20px;
+  }
+  .permission-illustration {
+    width: 240px;
+    margin-bottom: 24px;
+  }
+  .permission-dialog > p {
+    margin: 16px 0 24px;
+    font-size: 14px;
+  }
+  .permission-primary,
+  .permission-secondary {
+    min-width: 0;
+    width: 100%;
+    font-size: 14px;
+  }
+  .effects-dialog {
+    padding: 20px;
+  }
+}

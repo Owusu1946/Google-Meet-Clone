@@ -110,9 +110,9 @@ export default function Lobby() {
   return (
     <div>
       <Header navItems={false} />
-      <main className="mx-auto max-w-6xl px-5 py-10 lg:py-16 grid gap-12 lg:grid-cols-[1.5fr_1fr] items-center">
-        <MeetingPreview />
-        <section className="text-center space-y-5">
+      <main className="lobby-layout">
+        <MeetingPreview name={name || access?.identity.name || 'You'} />
+        <section className="lobby-join-panel">
           <h1 className="text-3xl">
             {access?.status === 'waiting'
               ? 'Asking to join…'
