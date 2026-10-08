@@ -1,3 +1,4 @@
+import { createDraftBarrier } from '@/lib/draft-barrier';
 import {
   validPresence,
   type WorkspacePresence,
@@ -20,6 +21,7 @@ export default function useWhiteboard() {
   const custom = useCallCustomData();
   const { access, chatClient, chatError } = useMeeting();
   const [operations, setOperations] = useState<BoardOperation[]>([]);
+  const [draftBarrier] = useState(createDraftBarrier);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [pending, setPending] = useState(0);
@@ -256,6 +258,12 @@ export default function useWhiteboard() {
   ]);
 
   const flush = useCallback((): Promise<boolean> => {
+    if (!draftBarrier.flush()) {
+      setError(
+        'Some local edits could not be saved. Restore editing access before leaving.',
+      );
+      return Promise.resolve(false);
+    }
     if (sending.current) return sending.current;
     if (!queue.current.length) return Promise.resolve(true);
     if (!chatClient) return Promise.resolve(false);
@@ -295,7 +303,7 @@ export default function useWhiteboard() {
     };
     sending.current = task();
     return sending.current;
-  }, [access.meetingId, chatClient, accept, persist]);
+  }, [access.meetingId, chatClient, accept, persist, draftBarrier]);
   useEffect(() => {
     if (!loading && chatClient) void flush();
   }, [loading, chatClient, flush]);
@@ -382,15 +390,24 @@ export default function useWhiteboard() {
   );
   useEffect(() => {
     const beforeUnload = (event: BeforeUnloadEvent) => {
-      if (queue.current.length) {
-        event.preventDefault();
-      }
+      const draftsSaved = draftBarrier.flush();
+      persist();
+      if (queue.current.length || !draftsSaved) event.preventDefault();
+    };
+    const pageHide = () => {
+      draftBarrier.flush();
+      persist();
     };
     window.addEventListener('beforeunload', beforeUnload);
-    return () => window.removeEventListener('beforeunload', beforeUnload);
-  }, []);
+    window.addEventListener('pagehide', pageHide);
+    return () => {
+      window.removeEventListener('beforeunload', beforeUnload);
+      window.removeEventListener('pagehide', pageHide);
+    };
+  }, [draftBarrier, persist]);
   return {
     operations,
+    registerDraft: draftBarrier.register,
     peers,
     announce,
     previewChange: (input: Record<string, unknown>) => {

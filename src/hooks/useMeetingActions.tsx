@@ -72,7 +72,17 @@ export default function useMeetingActions(): MeetingAction[] {
       icon: <Brush />,
       active: room.whiteboard || room.custom.boardPresenting === true,
       disabled: room.custom.boardPresenting === true,
-      onClick: () => room.setWhiteboard((value) => !value),
+      onClick: () => {
+        if (!room.whiteboard) room.setWhiteboard(true);
+        else
+          void run(async () => {
+            if (!(await room.board.flush()))
+              throw new Error(
+                'Save board edits before closing the whiteboard.',
+              );
+            room.setWhiteboard(false);
+          });
+      },
     },
     {
       id: 'reactions',

@@ -129,6 +129,9 @@ export default function WorkspaceScene({
     clearTimeout(textTimer.current);
     const pending = textPending.current;
     if (pending) {
+      if (!model.canEdit) return false;
+      // Clear before enqueuing: send() can request a nested draft flush.
+      textPending.current = undefined;
       const changed =
         model.patch(pending.id, { text: pending.text }, pending.operations) ||
         [];
@@ -136,7 +139,7 @@ export default function WorkspaceScene({
       textBaseline.current = merged;
       setText(textDocument(pending.id, merged).text);
     }
-    textPending.current = undefined;
+    return true;
   };
   const textBaseline = useRef<BoardOperation[]>(model.room.board.operations);
   const editTarget = useRef({ objects, canEdit: model.canEdit });
@@ -147,7 +150,7 @@ export default function WorkspaceScene({
       (object) => object.id === editRequest.id,
     );
     if (!item) return;
-    flushRef.current();
+    if (!flushRef.current()) return;
     setEditing(item.id);
     setText(item.text);
   }, [editRequest]);
@@ -161,7 +164,14 @@ export default function WorkspaceScene({
   }, [editing, sharedText, model.room.board.operations]);
   const flushRef = useRef(flushText);
   flushRef.current = flushText;
-  useEffect(() => () => flushRef.current(), []);
+  const registerDraft = model.room.board.registerDraft;
+  useEffect(() => {
+    const unregister = registerDraft(() => flushRef.current());
+    return () => {
+      flushRef.current();
+      unregister();
+    };
+  }, [registerDraft]);
   const start = (
     event: PointerEvent,
     item: WorkspaceObject,
@@ -284,7 +294,7 @@ export default function WorkspaceScene({
       style={{ pointerEvents: interactive ? 'auto' : 'none' }}
       onPointerDown={(event) => {
         if (event.target !== event.currentTarget || event.button !== 0) return;
-        flushText();
+        if (!flushText()) return;
         setEditing('');
         if (
           OBJECT_TYPES.includes(tool as ObjectType) &&
@@ -329,7 +339,7 @@ export default function WorkspaceScene({
         )
           return;
         if (event.key === 'Escape') {
-          flushText();
+          if (!flushText()) return;
           setEditing('');
           selectionDrag.current = undefined;
           setSelectionBox(undefined);
@@ -511,7 +521,7 @@ export default function WorkspaceScene({
                   ) {
                     event.preventDefault();
                     event.stopPropagation();
-                    flushText();
+                    if (!flushText()) return;
                     setEditing(item.id);
                     setText(item.text);
                   }
@@ -519,7 +529,7 @@ export default function WorkspaceScene({
                 onDoubleClick={(event) => {
                   if (!model.canEdit || tool !== 'select') return;
                   event.stopPropagation();
-                  flushText();
+                  if (!flushText()) return;
                   setEditing(item.id);
                   setText(item.text);
                 }}
@@ -541,13 +551,13 @@ export default function WorkspaceScene({
                 {editing === item.id ? (
                   <textarea
                     autoFocus
+                    readOnly={!model.canEdit}
                     maxLength={32000}
                     aria-label={`Edit ${item.type}`}
                     value={text}
                     onPointerDown={(event) => event.stopPropagation()}
                     onBlur={() => {
-                      flushText();
-                      setEditing('');
+                      if (flushText()) setEditing('');
                     }}
                     onChange={(event) => {
                       const value = event.target.value;
