@@ -1,5 +1,5 @@
+'use client';
 import { leaveCallOnce } from '@/lib/leave-call';
-('use client');
 import {
   createContext,
   useCallback,
