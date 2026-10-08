@@ -50,7 +50,8 @@ const Avatar = ({ text = '', width, participant = {} }: AvatarProps) => {
   if (image)
     return (
       <Image
-        className="rounded-full overflow-hidden"
+        className="rounded-full overflow-hidden shrink-0 object-cover"
+        style={{ width: width || IMAGE_SIZE, height: width || IMAGE_SIZE }}
         unoptimized
         src={image}
         alt={name}
@@ -64,6 +65,8 @@ const Avatar = ({ text = '', width, participant = {} }: AvatarProps) => {
       style={{
         backgroundColor: randomColor,
         width: width ? width : '30%',
+        height: width || undefined,
+        flexShrink: 0,
       }}
       className={clsx(
         !width && 'max-w-40',
