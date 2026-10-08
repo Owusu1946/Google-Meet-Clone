@@ -1,7 +1,6 @@
 import { useEffect, useRef } from 'react';
 import useMeetingActions from '@/hooks/useMeetingActions';
 import { useRoom } from '@/contexts/MeetingRoomContext';
-import useTime from '@/hooks/useTime';
 import CallControlButton from './CallControlButton';
 import Mic from './icons/Mic';
 import MicOff from './icons/MicOff';
@@ -29,7 +28,6 @@ export default function MeetingToolbar() {
     togglePanel,
     unread,
   } = room;
-  const { currentTime } = useTime();
   const actions = useMeetingActions();
   const toolbar = useRef<HTMLElement>(null);
   const { toolbarActionCount, setToolbarActionCount } = room;
@@ -40,12 +38,7 @@ export default function MeetingToolbar() {
       const width = entry.contentRect.width;
       // Equal side reserves keep controls centered without overlapping either side.
       setToolbarActionCount(
-        width < 768
-          ? 0
-          : Math.max(
-              0,
-              Math.floor((width - 224 - 2 * (width >= 1280 ? 240 : 84)) / 48),
-            ),
+        width < 768 ? 0 : Math.max(0, Math.floor((width - 480) / 56)),
       );
     });
     observer.observe(element);
@@ -55,11 +48,6 @@ export default function MeetingToolbar() {
   const overflow = actions.length > toolbarActionCount;
   return (
     <footer ref={toolbar} className="meeting-toolbar">
-      <div className="meeting-toolbar-info items-center gap-3 text-sm min-w-0">
-        <span>{currentTime}</span>
-        <span>·</span>
-        <span className="truncate">{access.meetingId}</span>
-      </div>
       <div className="meeting-toolbar-controls flex items-center justify-center gap-2 shrink-0">
         <CallControlButton
           title={
