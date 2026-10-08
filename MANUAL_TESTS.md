@@ -109,3 +109,5 @@ Record browser/device, scenario number, expected/actual result, and console/serv
 48. Draw a thick stroke, pan far away and erase an empty area, then choose Fit and export SVG/PNG. Fit and the exported page must remain framed around the content, including the stroke edges. An eraser-only board should retain the empty-board framing.
 
 49. Edit a code block: Tab inserts two spaces, selected lines indent together, and Shift+Tab removes indentation. A selection ending at the following line start must leave that line alone. Verify remote collaborators receive indentation edits, then press Escape to save and focus the canvas. Notes retain normal Tab navigation, and Escape during IME composition must not close the editor.
+
+50. Choose Connect, Tab to a source node and press Enter or Space, then Tab to a target and activate it. All collaborators should see the connection. Escape cancels the pending source. In Select mode, Tab to a connector: its endpoint names must be announced, it must become selected, contextual color changes and Delete must work, and Undo must restore it.

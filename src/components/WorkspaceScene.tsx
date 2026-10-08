@@ -208,6 +208,18 @@ export default function WorkspaceScene({
       unregister();
     };
   }, [registerDraft]);
+  const connectNode = (item: WorkspaceObject) => {
+    if (!model.canEdit || item.type === 'connector') return;
+    if (connectFrom && connectFrom !== item.id) {
+      model.create('connector', 0, 0, {
+        from: connectFrom,
+        to: item.id,
+        color: '#475569',
+      });
+      setConnectFrom('');
+      onTool('select');
+    } else setConnectFrom(item.id);
+  };
   const start = (
     event: PointerEvent,
     item: WorkspaceObject,
@@ -226,16 +238,7 @@ export default function WorkspaceScene({
       return;
     }
     if (tool === 'connect') {
-      if (!model.canEdit || item.type === 'connector') return;
-      if (connectFrom && connectFrom !== item.id) {
-        model.create('connector', 0, 0, {
-          from: connectFrom,
-          to: item.id,
-          color: '#475569',
-        });
-        setConnectFrom('');
-        onTool('select');
-      } else setConnectFrom(item.id);
+      connectNode(item);
       return;
     }
     if (tool !== 'select') return;
@@ -470,6 +473,21 @@ export default function WorkspaceScene({
                 return (
                   <g
                     key={item.id}
+                    role="button"
+                    tabIndex={interactive && tool === 'select' ? 0 : -1}
+                    aria-label={`Connection from ${objects.find((node) => node.id === item.from)?.text || 'Untitled node'} to ${objects.find((node) => node.id === item.to)?.text || 'Untitled node'}`}
+                    aria-pressed={model.selected.includes(item.id)}
+                    onFocus={(event) => {
+                      if (event.currentTarget.matches(':focus-visible'))
+                        model.setSelected([item.id]);
+                    }}
+                    onKeyDown={(event) => {
+                      if (event.key === 'Enter' || event.key === ' ') {
+                        event.preventDefault();
+                        event.stopPropagation();
+                        model.setSelected([item.id]);
+                      }
+                    }}
                     onPointerDown={(event) => start(event, item)}
                     className={
                       model.selected.includes(item.id) ? 'is-selected' : ''
@@ -549,6 +567,16 @@ export default function WorkspaceScene({
                     model.setSelected([item.id]);
                 }}
                 onKeyDown={(event) => {
+                  if (
+                    tool === 'connect' &&
+                    (event.key === 'Enter' || event.key === ' ') &&
+                    event.target === event.currentTarget
+                  ) {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    connectNode(item);
+                    return;
+                  }
                   if (
                     (event.key === 'Enter' || event.key === 'F2') &&
                     model.canEdit &&
@@ -738,7 +766,8 @@ export default function WorkspaceScene({
       })}
       {connectFrom && (
         <div className="workspace-hint" role="status">
-          Choose another node to connect · Escape to cancel
+          Choose another node and click or press Enter to connect · Escape to
+          cancel
         </div>
       )}
     </div>
