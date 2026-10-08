@@ -12,3 +12,7 @@ The board must support design planning, writing, developer diagrams, Kanban, fra
 - [ ] Manual visual/media checks documented (user requested no browser automation).
 
 Atomic commits will separate model/protocol, interaction surfaces, collaboration, templates/export and verification. Completion requires evidence for all requested workflows; passing existing drawing tests alone does not prove the new workspace.
+
+## Verification evidence
+
+31 automated tests, typecheck and lint pass. Live verification passed 73 API/service checks, including object persistence, retries, permissions, presence, and shared presentation settings. A production build passed before the final interaction refinements; those refinements have typecheck/lint coverage. Manual visual, touch, multi-device text editing and latency checks remain outstanding in MANUAL_TESTS.md. No browser was opened.
