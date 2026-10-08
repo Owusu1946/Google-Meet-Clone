@@ -10,7 +10,9 @@ export default function MeetingTopbar() {
       <div className="meeting-topbar-details">
         <time suppressHydrationWarning>{currentTime}</time>
         <span className="meeting-topbar-divider" />
-        <span>{room.access.meetingId}</span>
+        <span className="meeting-topbar-code" title={room.access.meetingId}>
+          {room.access.meetingId}
+        </span>
         <button
           aria-label="Meeting details"
           aria-pressed={room.panel === 'details'}

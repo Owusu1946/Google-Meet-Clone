@@ -1552,6 +1552,25 @@ input:focus-visible {
   }
   .meeting-topbar-people {
     gap: 8px;
+    flex-shrink: 0;
+  }
+  .meeting-topbar-details {
+    flex: 1;
+    gap: 8px;
+  }
+  .meeting-topbar-code {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .meeting-topbar-details button {
+    flex-shrink: 0;
+  }
+  .meeting-topbar:has(.admission-trigger) .meeting-participant-avatar {
+    display: none;
+  }
+  .meeting-topbar:has(.admission-trigger) .meeting-participant-pill {
+    padding: 8px 12px;
   }
   .admission-popover {
     position: fixed;
