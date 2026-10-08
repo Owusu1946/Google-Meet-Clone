@@ -2,41 +2,60 @@
 
 export type MeetingSound = 'join' | 'leave' | 'request' | 'end';
 let context: AudioContext | undefined;
-const notes: Record<MeetingSound, number[]> = {
-  join: [440, 660],
-  leave: [660, 440],
-  request: [523, 784, 523],
-  end: [523, 392, 262],
+let audio: Promise<AudioBuffer> | undefined;
+
+// Keep the original join cue unchanged. Other events use subtle pitch/tempo
+// variations of the same recording to retain its timbre and short chime feel.
+const playback: Record<MeetingSound, { rate: number; volume: number }> = {
+  join: { rate: 1, volume: 1 },
+  leave: { rate: 0.85, volume: 0.8 },
+  request: { rate: 1.12, volume: 0.9 },
+  end: { rate: 0.7, volume: 0.9 },
 };
 
-// Unlock once from a real gesture. Keep the context across route transitions so
-// the final tone is not cut off when the meeting screen unmounts.
+function loadSound(current: AudioContext) {
+  audio ||= fetch('/sounds/meeting-join.ogg')
+    .then((response) => {
+      if (!response.ok) throw new Error('Meeting sound unavailable.');
+      return response.arrayBuffer();
+    })
+    .then((buffer) => current.decodeAudioData(buffer))
+    .catch((error: unknown) => {
+      audio = undefined;
+      throw error;
+    });
+  return audio;
+}
+
+// Unlock and preload from a real gesture. Keep audio across route transitions
+// so leaving or ending the meeting does not cut off the final cue.
 export function unlockMeetingSounds() {
   try {
     context ||= new AudioContext();
     void context.resume().catch(() => undefined);
+    void loadSound(context).catch(() => undefined);
   } catch {
     // Audio is optional on unsupported devices.
   }
 }
 export function playMeetingSound(sound: MeetingSound) {
-  if (!context || context.state !== 'running') return;
-  const start = context.currentTime;
-  notes[sound].forEach((frequency, index) => {
-    const oscillator = context!.createOscillator();
-    const gain = context!.createGain();
-    const time = start + index * 0.14;
-    oscillator.frequency.value = frequency;
-    gain.gain.setValueAtTime(0, time);
-    gain.gain.linearRampToValueAtTime(0.06, time + 0.012);
-    gain.gain.exponentialRampToValueAtTime(0.001, time + 0.13);
-    oscillator.connect(gain);
-    gain.connect(context!.destination);
-    oscillator.start(time);
-    oscillator.stop(time + 0.14);
-    oscillator.onended = () => {
-      oscillator.disconnect();
-      gain.disconnect();
-    };
-  });
+  const current = context;
+  if (!current || current.state !== 'running') return;
+  void loadSound(current)
+    .then((buffer) => {
+      if (current.state !== 'running') return;
+      const source = current.createBufferSource();
+      const gain = current.createGain();
+      source.buffer = buffer;
+      source.playbackRate.value = playback[sound].rate;
+      gain.gain.value = playback[sound].volume;
+      source.connect(gain);
+      gain.connect(current.destination);
+      source.onended = () => {
+        source.disconnect();
+        gain.disconnect();
+      };
+      source.start();
+    })
+    .catch(() => undefined);
 }
