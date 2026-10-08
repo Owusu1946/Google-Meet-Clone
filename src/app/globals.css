@@ -19,6 +19,9 @@
 .meet-dialog::backdrop {
   background: rgba(0, 0, 0, 0.55);
 }
+html:has(dialog[open]) {
+  overflow: hidden;
+}
 .option-button {
   @apply rounded-xl border border-hairline-gray p-3 text-left text-sm hover:bg-light-gray disabled:opacity-40;
 }
@@ -733,9 +736,17 @@ input:focus-visible {
 }
 .permission-dialog {
   width: min(960px, 94vw);
-  padding: 32px 48px 40px;
+  height: min(760px, calc(100dvh - 32px));
+  max-height: calc(100dvh - 32px);
+  padding: clamp(16px, 3dvh, 32px) clamp(16px, 4vw, 48px);
+  overflow: visible;
   border-radius: 32px;
   text-align: center;
+}
+.permission-dialog[open] {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto auto auto auto;
+  gap: clamp(8px, 2dvh, 20px);
 }
 .permission-dialog > div:first-child {
   margin-bottom: 0;
@@ -749,9 +760,12 @@ input:focus-visible {
   clip-path: inset(50%);
 }
 .permission-illustration {
-  width: min(100%, 430px);
-  height: auto;
-  margin: 0 auto 36px;
+  width: 100%;
+  max-width: 430px;
+  height: 100%;
+  min-height: 0;
+  object-fit: contain;
+  margin: 0 auto;
 }
 .permission-dialog > h2 {
   font-size: clamp(22px, 2.2vw, 30px);
@@ -759,7 +773,7 @@ input:focus-visible {
   font-weight: 400;
 }
 .permission-dialog > p {
-  margin: 24px 0 40px;
+  margin: 0;
   color: #5f6368;
   font-size: 17px;
 }
@@ -803,6 +817,11 @@ input:focus-visible {
   font-size: 26px;
 }
 .permission-alternatives {
+  position: absolute;
+  bottom: calc(100% + 8px);
+  z-index: 1;
+  background: white;
+  box-shadow: 0 4px 16px #0002;
   display: flex;
   flex-direction: column;
   border: 1px solid #dadce0;
@@ -819,7 +838,7 @@ input:focus-visible {
 }
 .permission-dialog > small {
   display: block;
-  margin-top: 26px;
+  margin-top: 0;
   color: #747775;
   font-size: 12px;
 }
@@ -975,11 +994,10 @@ input:focus-visible {
     padding: 20px;
   }
   .permission-illustration {
-    width: 240px;
-    margin-bottom: 24px;
+    max-width: 240px;
   }
   .permission-dialog > p {
-    margin: 16px 0 24px;
+    margin: 0;
     font-size: 14px;
   }
   .permission-primary,
@@ -990,6 +1008,43 @@ input:focus-visible {
   }
   .effects-dialog {
     padding: 20px;
+  }
+}
+
+@media (max-height: 560px) {
+  .permission-dialog {
+    height: auto;
+    padding: 12px 20px;
+  }
+  .permission-dialog[open] {
+    grid-template-rows: auto auto auto auto;
+    gap: 8px;
+  }
+  .permission-illustration,
+  .permission-dialog > small {
+    display: none;
+  }
+  .permission-dialog > h2 {
+    font-size: 20px;
+    line-height: 1.2;
+  }
+  .permission-dialog > p {
+    font-size: 14px;
+  }
+  .permission-actions {
+    gap: 8px;
+  }
+  .permission-primary,
+  .permission-secondary {
+    min-width: 0;
+    width: auto;
+    min-height: 40px;
+    padding: 8px 16px;
+    font-size: 14px;
+  }
+  .permission-expand {
+    width: 40px;
+    height: 40px;
   }
 }
 
