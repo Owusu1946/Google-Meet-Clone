@@ -16,3 +16,5 @@ Atomic commits will separate model/protocol, interaction surfaces, collaboration
 ## Verification evidence
 
 46 automated tests, typecheck and lint pass. Live verification passed 83 API/service checks, including object persistence, retries, permissions, presence, concurrent writing, selective text undo, text recovery, collaboration restrictions, and shared presentation settings. The production build passed after the interaction refinements and marquee/frame keyboard changes and ordered Kanban interaction fixes and editor draft save barriers and bulk enqueue/persistence and reversible mixed object/ink imports and Clear/deletion interaction resets. Manual visual, touch, multi-device text editing and latency checks remain outstanding in MANUAL_TESTS.md. No browser was opened.
+
+- Concurrent object history follow-up: 48 automated tests pass, including selective property Undo/Redo and consecutive ownership transfer. Typecheck and lint pass. Manual multi-user history acceptance is listed in steps 45–46; browser verification remains pending.

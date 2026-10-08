@@ -2,6 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import {
+  rebaseWorkspaceHistory,
   selectiveWorkspaceChange,
   workspaceCreation,
   workspaceRedo,
@@ -164,5 +165,65 @@ test('selective object undo and redo preserve later peer property writes', () =>
       ],
     ),
     { forward: [], backward: [] },
+  );
+});
+
+test('consecutive undo transfers ownership per property without claiming peer writes', () => {
+  const make = (
+    fields: Record<string, number>,
+    time: number,
+    actor = 'alice',
+  ): BoardOperation => ({
+    id: randomUUID(),
+    actor,
+    time: new Date(time).toISOString(),
+    kind: 'object-patch',
+    objectId: 'alice:object',
+    fields,
+  });
+  const first = make({ x: 10, y: 10 }, 1);
+  const peer = make({ x: 15 }, 2, 'bob');
+  const second = make({ x: 20, y: 20 }, 3);
+  const inverse = make({ x: 15, y: 10 }, 4);
+  const earlier = {
+    forward: [first],
+    backward: [
+      {
+        kind: 'object-patch' as const,
+        objectId: 'alice:object',
+        fields: { x: 0, y: 0 },
+      },
+    ],
+  };
+  const current = [first, peer, second];
+  const [rebased] = rebaseWorkspaceHistory(
+    [earlier],
+    { forward: [second], backward: [] },
+    [inverse],
+    current,
+  );
+  const next = selectiveWorkspaceChange(
+    rebased,
+    rebased.forward as BoardOperation[],
+    [...current, inverse],
+  );
+  assert.deepEqual(next.backward, [
+    { kind: 'object-patch', objectId: 'alice:object', fields: { y: 0 } },
+  ]);
+  const redoEarlier = make({ y: 10 }, 6);
+  const undoEarlier = make({ y: 0 }, 5);
+  const [redoLater] = rebaseWorkspaceHistory(
+    [{ forward: [inverse], backward: [] }],
+    { forward: [undoEarlier], backward: [] },
+    [redoEarlier],
+    [...current, inverse, undoEarlier],
+  );
+  assert.deepEqual(
+    selectiveWorkspaceChange(
+      { forward: [second], backward: [] },
+      redoLater.forward as BoardOperation[],
+      [...current, inverse, undoEarlier, redoEarlier],
+    ).forward,
+    [second],
   );
 });

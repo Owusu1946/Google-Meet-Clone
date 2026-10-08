@@ -135,3 +135,47 @@ export function selectiveWorkspaceChange(
     });
   return { forward: filter(change.forward), backward: filter(change.backward) };
 }
+
+// A successful undo becomes the latest write for the edit immediately beneath it.
+// Transfer that ownership so consecutive Undo commands can continue backwards.
+export function rebaseWorkspaceHistory(
+  history: WorkspaceChange[],
+  undone: WorkspaceChange,
+  appliedUndo: BoardOperation[],
+  current: BoardOperation[],
+): WorkspaceChange[] {
+  const removed = new Set(
+    undone.forward.flatMap((op) => ('id' in op ? [op.id] : [])),
+  );
+  const prior = new Map<string, string>();
+  const key = (id: string, field: string) => JSON.stringify([id, field]);
+  for (const op of [...current].sort(compareOperations)) {
+    if (removed.has(op.id)) continue;
+    if (op.kind === 'clear') prior.clear();
+    if (op.kind === 'object-create' || op.kind === 'object-patch')
+      for (const field of Object.keys(op.fields))
+        prior.set(key(op.objectId, field), op.id);
+  }
+  const replacements = new Map<string, { before: string; after: string }>();
+  for (const op of appliedUndo)
+    if (op.kind === 'object-patch')
+      for (const field of Object.keys(op.fields)) {
+        const address = key(op.objectId, field);
+        const before = prior.get(address);
+        if (before) replacements.set(address, { before, after: op.id });
+      }
+  return history.map((change) => ({
+    ...change,
+    forward: change.forward.flatMap((op) => {
+      if (op.kind !== 'object-patch' || !('id' in op)) return [op];
+      return Object.entries(op.fields).map(([field, value]) => {
+        const replacement = replacements.get(key(op.objectId, field));
+        return {
+          ...op,
+          id: replacement?.before === op.id ? replacement.after : op.id,
+          fields: { [field]: value },
+        };
+      });
+    }),
+  }));
+}

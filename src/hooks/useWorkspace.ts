@@ -2,6 +2,7 @@
 import { prepareBoardOperations } from '@/lib/board-input';
 import { boardEpoch } from '@/lib/board-epoch';
 import {
+  rebaseWorkspaceHistory,
   selectiveWorkspaceChange,
   workspaceCreation,
   workspaceRedo,
@@ -230,10 +231,11 @@ export default function useWorkspace() {
     if (!canEdit || historyEpoch.current !== epoch) return;
     const change = undoStack.current.pop();
     if (!change) return;
+    const current = room.board.getOperations();
     const trimmed = selectiveWorkspaceChange(
       change,
       change.forward as BoardOperation[],
-      room.board.getOperations(),
+      current,
     );
     const appliedUndo = prepareBoardOperations(
       trimmed.backward,
@@ -243,6 +245,12 @@ export default function useWorkspace() {
       undoStack.current.push(change);
       return;
     }
+    undoStack.current = rebaseWorkspaceHistory(
+      undoStack.current,
+      trimmed,
+      appliedUndo,
+      current,
+    );
     if (appliedUndo.length)
       redoStack.current.push({ change: trimmed, appliedUndo });
     setHistoryVersion((value) => value + 1);
@@ -251,10 +259,11 @@ export default function useWorkspace() {
     if (!canEdit || historyEpoch.current !== epoch) return;
     const entry = redoStack.current.pop();
     if (!entry) return;
+    const current = room.board.getOperations();
     const change = selectiveWorkspaceChange(
       entry.change,
       entry.appliedUndo,
-      room.board.getOperations(),
+      current,
     );
     const replay = prepareBoardOperations(
       workspaceRedo(change),
