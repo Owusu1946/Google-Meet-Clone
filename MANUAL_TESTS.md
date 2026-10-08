@@ -107,3 +107,5 @@ Record browser/device, scenario number, expected/actual result, and console/serv
 47. While editing a note or code block, type a final sentence and immediately export JSON, SVG and PNG. Each file must contain the latest text. Re-import JSON from a reordered Kanban board and verify its ordering and connections remain editable. If editing permission is revoked with a pending draft, export must report the unsaved draft instead of downloading stale content.
 
 48. Draw a thick stroke, pan far away and erase an empty area, then choose Fit and export SVG/PNG. Fit and the exported page must remain framed around the content, including the stroke edges. An eraser-only board should retain the empty-board framing.
+
+49. Edit a code block: Tab inserts two spaces, selected lines indent together, and Shift+Tab removes indentation. A selection ending at the following line start must leave that line alone. Verify remote collaborators receive indentation edits, then press Escape to save and focus the canvas. Notes retain normal Tab navigation, and Escape during IME composition must not close the editor.

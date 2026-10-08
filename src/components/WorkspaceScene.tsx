@@ -1,4 +1,5 @@
 'use client';
+import { indentCode } from '@/lib/code-indent';
 import { useEffect, useRef, useState, type PointerEvent } from 'react';
 import type useWorkspace from '@/hooks/useWorkspace';
 import {
@@ -589,8 +590,57 @@ export default function WorkspaceScene({
                     readOnly={!model.canEdit}
                     maxLength={32000}
                     aria-label={`Edit ${item.type}`}
+                    title={
+                      item.type === 'code'
+                        ? 'Tab to indent, Shift+Tab to outdent, Escape to save and exit'
+                        : 'Escape to save and exit'
+                    }
                     value={text}
                     onPointerDown={(event) => event.stopPropagation()}
+                    onKeyDown={(event) => {
+                      if (event.nativeEvent.isComposing) return;
+                      if (event.key === 'Escape') {
+                        event.preventDefault();
+                        event.stopPropagation();
+                        if (flushText()) {
+                          setEditing('');
+                          root.current?.focus();
+                        }
+                      }
+                      if (
+                        event.key !== 'Tab' ||
+                        item.type !== 'code' ||
+                        !model.canEdit
+                      )
+                        return;
+                      event.preventDefault();
+                      event.stopPropagation();
+                      const editor = event.currentTarget;
+                      const next = indentCode(
+                        editor.value,
+                        editor.selectionStart,
+                        editor.selectionEnd,
+                        event.shiftKey,
+                      );
+                      if (next.text.length > 32000) return;
+                      setText(next.text);
+                      textPending.current = {
+                        id: item.id,
+                        text: next.text,
+                        operations:
+                          textPending.current?.operations ||
+                          textBaseline.current,
+                      };
+                      clearTimeout(textTimer.current);
+                      textTimer.current = setTimeout(
+                        () => flushRef.current(),
+                        200,
+                      );
+                      requestAnimationFrame(() => {
+                        if (editor.isConnected)
+                          editor.setSelectionRange(next.start, next.end);
+                      });
+                    }}
                     onBlur={() => {
                       if (flushText()) setEditing('');
                     }}

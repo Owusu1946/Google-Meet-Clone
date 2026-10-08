@@ -24,3 +24,5 @@ Atomic commits will separate model/protocol, interaction surfaces, collaboration
 - Isolated production build passed after selective/consecutive object history and synchronous export capture changes.
 
 - Fit/export bounds follow-up: 50 automated tests pass; typecheck and lint pass. Eraser-only extents no longer enlarge framing, visible ink width is included, and bounds scan points without allocating a duplicate array. Manual acceptance is step 48.
+
+- Developer editing follow-up: 53 tests, typecheck and lint pass. Code editors support caret/multiline indentation and outdent; Escape saves and restores canvas focus without interrupting IME composition. Manual keyboard/collaboration acceptance is step 49.
