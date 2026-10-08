@@ -1,5 +1,11 @@
 # Manual meeting acceptance
 
+## Larger calls and admit all
+
+- Join 11 sessions, including a host and several ordinary participants. The adaptive grid shows a bounded number of tiles plus an accurate N others tile, retains your own tile, and keeps grouped remote speakers audible. Both hosts and nonhosts can click the group tile or the numbered others link in the hover preview to open the full searchable People panel. Resize with the panel open, remove/leave several sessions, and verify counts immediately recompute without stale pages or duplicate audio.
+- The participant pill shows up to four small avatars and the actual participant count. Search lists all joined sessions, including grouped people; it must not expose host admission actions to nonhosts.
+- As host, open Admit all from People or the admission popover. The confirmation lists the specific applicants. Cancel/Escape changes nothing. Confirm admits only that snapshot; applicants arriving while it is open wait for the next action. During admission, duplicate submission is disabled. Reject one API request or lock the call: successful admissions remain successful, failures remain visible, and Retry remaining does not resubmit successful IDs. Check cancellation/denial by another action and reopening the dialog. Host authorization remains enforced by each existing admission API call.
+
 ## People and presenter UI
 
 - Hover the top-right participant pill using a mouse: a dark People preview appears. Moving into the preview keeps it open; leaving closes it. Keyboard focus also exposes it; Escape dismisses it. Click the pill or View everyone to open the full People panel. On touch, tap opens the panel directly.

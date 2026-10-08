@@ -8,6 +8,7 @@ import Avatar from './Avatar';
 import type { JoinRequest } from '@/lib/meeting';
 import { useState } from 'react';
 import PresentToAll from './icons/PresentToAll';
+import AdmitAllButton from './AdmitAllButton';
 export default function PeoplePopup({
   participants,
   hostId,
@@ -58,6 +59,7 @@ export default function PeoplePopup({
           <h3 className="text-sm font-medium mb-3">
             Waiting to join ({requests.length})
           </h3>
+          <AdmitAllButton />
           {requests.map((request) => (
             <div key={request.id} className="rounded-xl bg-blue-50 p-3 mb-2">
               <p className="font-medium text-sm">{request.name}</p>

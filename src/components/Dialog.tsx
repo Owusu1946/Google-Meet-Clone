@@ -27,7 +27,11 @@ export default function Dialog({
     <dialog
       ref={ref}
       aria-labelledby={id}
-      onCancel={onClose}
+      onCancel={(event) => {
+        // State owns closing, including dialogs that block dismissal while busy.
+        event.preventDefault();
+        onClose();
+      }}
       onClick={(event) => {
         if (event.target === event.currentTarget) onClose();
       }}
