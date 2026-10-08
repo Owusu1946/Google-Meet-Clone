@@ -331,11 +331,12 @@ function useRoomState() {
       return;
     setShowCaptions(true);
   };
+  const resolveJoinRequest = async (id: string, allowed: boolean) => {
+    await hostAction(allowed ? 'admit' : 'deny', { userId: id });
+    setRequests((current) => current.filter((request) => request.id !== id));
+  };
   const admit = (id: string, allowed: boolean) =>
-    void run(async () => {
-      await hostAction(allowed ? 'admit' : 'deny', { userId: id });
-      setRequests((current) => current.filter((request) => request.id !== id));
-    });
+    void run(() => resolveJoinRequest(id, allowed));
   const togglePanel = (value: Exclude<Panel, null>) =>
     setPanel((current) => (current === value ? null : value));
   return {
@@ -394,6 +395,7 @@ function useRoomState() {
     leave,
     toggleCaptions,
     admit,
+    resolveJoinRequest,
     togglePanel,
   };
 }

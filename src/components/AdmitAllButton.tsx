@@ -14,7 +14,7 @@ export default function AdmitAllButton() {
       if (!selected?.length) return;
       const result = await admitRequests(
         selected.map((request) => request.id),
-        (id) => room.hostAction('admit', { userId: id }),
+        (id) => room.resolveJoinRequest(id, true),
       );
       if (!result.failed.length) {
         setSelected(undefined);
