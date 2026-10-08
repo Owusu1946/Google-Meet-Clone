@@ -6,6 +6,9 @@ import MeetProvider from '@/contexts/MeetProvider';
 import { MeetingRoomProvider, useRoom } from '@/contexts/MeetingRoomContext';
 import { RaisedHandsProvider } from '@/contexts/RaisedHandsContext';
 import GridLayout from '@/components/GridLayout';
+import FocusLayout from '@/components/FocusLayout';
+import MeetingTopbar from '@/components/MeetingTopbar';
+import MeetingWelcomeCard from '@/components/MeetingWelcomeCard';
 import SpeakerLayout from '@/components/SpeakerLayout';
 import CaptionsOverlay from '@/components/CaptionsOverlay';
 import SmartWhiteboardOverlay from '@/components/SmartWhiteboardOverlay';
@@ -28,7 +31,6 @@ function MeetingRoom() {
   const room = useRoom();
   const {
     panel,
-    setPanel,
     spotlight,
     raisedUserIds,
     whiteboard,
@@ -37,7 +39,6 @@ function MeetingRoom() {
     captions,
     state,
     recording,
-    requests,
     error,
     setError,
     reactions,
@@ -58,10 +59,17 @@ function MeetingRoom() {
   return (
     <StreamTheme className="root-theme">
       <div id="meeting-root" className="meeting-shell">
+        <MeetingTopbar />
         <main className={`meeting-content ${panel ? 'has-panel' : ''}`}>
           <div className="meeting-stage">
             <RaisedHandsProvider value={{ raisedUserIds }}>
-              {spotlight ? <SpeakerLayout /> : <GridLayout />}
+              {spotlight ? (
+                <SpeakerLayout />
+              ) : room.layout === 'auto' && room.participants.length <= 2 ? (
+                <FocusLayout />
+              ) : (
+                <GridLayout />
+              )}
             </RaisedHandsProvider>
             {room.custom.boardPresenting === true && !whiteboard && (
               <button
@@ -102,18 +110,9 @@ function MeetingRoom() {
                 This meeting is being recorded
               </div>
             )}
-            {requests.length > 0 && panel !== 'people' && (
-              <button
-                className="admission-banner"
-                onClick={() => setPanel('people')}
-              >
-                {requests.length}{' '}
-                {requests.length === 1 ? 'person is' : 'people are'} waiting to
-                join · Review
-              </button>
-            )}
           </div>
           <MeetingPanels />
+          <MeetingWelcomeCard />
         </main>
         <MeetingToolbar />
         {error && (

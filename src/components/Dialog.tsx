@@ -7,11 +7,13 @@ export default function Dialog({
   onClose,
   title,
   children,
+  className = '',
 }: {
   open: boolean;
   onClose: () => void;
   title: string;
   children: ReactNode;
+  className?: string;
 }) {
   const ref = useRef<HTMLDialogElement>(null);
   const id = useId();
@@ -29,7 +31,7 @@ export default function Dialog({
       onClick={(event) => {
         if (event.target === event.currentTarget) onClose();
       }}
-      className="meet-dialog"
+      className={`meet-dialog ${className}`}
     >
       <div className="flex items-center justify-between gap-4 mb-5">
         <h2 id={id} className="text-xl font-medium">

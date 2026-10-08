@@ -17,7 +17,12 @@ import {
 import { AccessStatus } from '@/lib/meeting';
 
 type Context = { params: Promise<{ meetingId: string }> };
-async function access(meetingId: string, ask: boolean, name?: string) {
+async function access(
+  meetingId: string,
+  ask: boolean,
+  name?: string,
+  cancel = false,
+) {
   const user = await identity({ createGuest: true, name });
   const call = meetingCall(meetingId);
   const { call: data } = await call.get();
@@ -29,6 +34,11 @@ async function access(meetingId: string, ask: boolean, name?: string) {
     filter_conditions: { user_id: user.id },
     limit: 1,
   });
+  if (cancel && !isHost) {
+    const channel = requestChannel(meetingId, user.id);
+    if ((await streamRequestState(channel.id!)) === 'waiting')
+      await channel.updatePartial({ set: { status: 'cancelled' } });
+  }
   if (data.ended_at) status = 'ended';
   else if (data.blocked_user_ids.includes(user.id)) status = 'denied';
   else if (isHost || member.members.length) status = 'ready';
@@ -54,6 +64,14 @@ async function access(meetingId: string, ask: boolean, name?: string) {
             requested_at: new Date().toISOString(),
           })
           .create();
+        if (result.channel?.status === 'cancelled')
+          await channel.updatePartial({
+            set: {
+              status: 'waiting',
+              applicant_name: user.name,
+              requested_at: new Date().toISOString(),
+            },
+          });
         status = result.channel?.status === 'denied' ? 'denied' : 'waiting';
       }
     } else {
@@ -102,6 +120,7 @@ export async function POST(request: Request, context: Context) {
         meetingId,
         body.ask === true,
         typeof body.name === 'string' ? body.name : undefined,
+        body.cancel === true,
       ),
     );
   } catch (error) {

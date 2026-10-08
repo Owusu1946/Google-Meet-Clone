@@ -24,7 +24,10 @@ const VideoPlaceholder = forwardRef<HTMLDivElement, VideoPlaceholderProps>(
     return (
       <div
         ref={ref}
-        style={style}
+        style={{
+          ...style,
+          background: `radial-gradient(circle at center, ${randomColor}88, ${randomColor}22), #092c3c`,
+        }}
         className={`absolute w-full h-full rounded-[inherit] bg-dark-gray flex items-center justify-center ${placeholderClassName}`}
       >
         {participant.image && (

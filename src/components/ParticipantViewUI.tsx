@@ -54,7 +54,7 @@ export default function ParticipantViewUI() {
           aria-label={`${pinned ? 'Unpin' : 'Pin'} ${name}`}
           aria-pressed={pinned}
           onClick={togglePin}
-          className="p-2 rounded-full bg-black/50 text-white hover:bg-black/80"
+          className="participant-pin p-2 rounded-full bg-black/30 text-white hover:bg-black/60"
         >
           {pinned ? <KeepOffFilled /> : <Keep />}
         </button>
@@ -68,7 +68,7 @@ export default function ParticipantViewUI() {
             ✋
           </span>
         )}
-        <span className="truncate px-2 py-1 rounded-md bg-black/50">
+        <span className="truncate px-2 py-1 font-medium participant-name">
           {name}
           {trackType === 'screenShareTrack' ? ' · presenting' : ''}
         </span>
