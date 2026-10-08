@@ -68,12 +68,14 @@ async function request(
   user: string,
   body?: unknown,
   expected = 200,
+  tab?: string,
 ) {
   for (let attempt = 0; attempt < 3; attempt++) {
     const response = await fetch(`${base}${route}`, {
       method: body === undefined ? 'GET' : 'POST',
       headers: {
         origin: base!,
+        ...(tab ? { 'x-meet-guest-tab': tab } : {}),
         cookie: cookies.get(user)!,
         'content-type': 'application/json',
       },
@@ -192,6 +194,30 @@ try {
     applicant,
   );
   await request(`${path}/host`, host, { action: 'admit', userId: applicant });
+  // A new tab carries the browser's admitted legacy cookie, but must receive
+  // a separate identity and remain outside the restricted call.
+  const freshTab = await request(
+    `${path}/access`,
+    applicant,
+    {},
+    200,
+    randomUUID(),
+  );
+  assert.equal(freshTab.status, 'request');
+  assert.notEqual(freshTab.identity.id, applicant);
+  assert.equal(
+    (
+      await request(`${path}/access`, outsider, {
+        ask: true,
+        name: 'Second guest',
+      })
+    ).status,
+    'waiting',
+  );
+  await request('/api/token', outsider, { meetingId: id }, 403);
+  assert.equal((await request(`${path}/host`, host)).requests[0]?.id, outsider);
+  await request(`${path}/access`, outsider, { cancel: true });
+
   assert.equal(
     (await request(`${path}/access`, applicant, {})).status,
     'ready',
