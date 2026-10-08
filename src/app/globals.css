@@ -1391,3 +1391,157 @@ input:focus-visible {
     margin-bottom: 20px;
   }
 }
+
+.meeting-topbar {
+  position: relative;
+  z-index: 60;
+}
+.meeting-topbar-people {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.admission-control {
+  position: relative;
+}
+.admission-trigger {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border-radius: 28px;
+  background: #81d88d;
+  color: #064c24;
+  padding: 10px 16px;
+  font-size: 14px;
+  font-weight: 500;
+}
+.admission-trigger svg {
+  fill: currentColor;
+}
+.admission-popover {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 16px);
+  width: min(400px, calc(100vw - 32px));
+  border-radius: 24px;
+  padding: 20px;
+  background: #282b2d;
+  color: #e3e3e3;
+  box-shadow: 0 8px 30px #0005;
+}
+.admission-popover-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 20px;
+}
+.admission-popover-heading h2 {
+  font-size: 18px;
+  font-weight: 500;
+}
+.admission-popover-heading > span {
+  font-size: 11px;
+  padding: 3px 6px;
+  background: #3c4043;
+  border-radius: 4px;
+  color: #bdc1c6;
+}
+.admission-request-list {
+  max-height: min(400px, 55svh);
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.admission-request {
+  padding: 14px;
+  background: #333638;
+  border-radius: 18px;
+}
+.admission-person {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+.admission-person > div {
+  min-width: 0;
+}
+.admission-person strong {
+  font-size: 14px;
+  font-weight: 500;
+  overflow-wrap: anywhere;
+}
+.admission-person p {
+  font-size: 12px;
+  color: #bdc1c6;
+  margin-top: 4px;
+}
+.admission-avatar {
+  flex-shrink: 0;
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  background: #0097a7;
+  display: grid;
+  place-items: center;
+  font-size: 18px;
+}
+.admission-request-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-top: 16px;
+}
+.admission-request-actions button {
+  border: 1px solid #5f6368;
+  border-radius: 18px;
+  padding: 9px;
+  font-size: 13px;
+  font-weight: 500;
+}
+.admission-request-actions button:hover {
+  background: #444746;
+}
+.admission-request-actions button:disabled {
+  opacity: 0.5;
+}
+.admission-view-all {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 16px;
+  padding: 16px 0 0;
+  color: #a8c7fa;
+  width: 100%;
+  font-size: 14px;
+}
+.admission-view-all span {
+  font-size: 24px;
+}
+@media (max-width: 600px) {
+  .admission-trigger {
+    padding: 8px 10px;
+    font-size: 12px;
+    gap: 6px;
+  }
+  .admission-trigger svg {
+    width: 18px;
+    height: 18px;
+  }
+  .meeting-topbar-people {
+    gap: 8px;
+  }
+  .admission-popover {
+    position: fixed;
+    left: 16px;
+    right: 16px;
+    top: 68px;
+    width: auto;
+  }
+  .admission-popover-heading {
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+}

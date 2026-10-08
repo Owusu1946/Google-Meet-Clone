@@ -31,7 +31,6 @@ function MeetingRoom() {
   const room = useRoom();
   const {
     panel,
-    setPanel,
     spotlight,
     raisedUserIds,
     whiteboard,
@@ -40,7 +39,6 @@ function MeetingRoom() {
     captions,
     state,
     recording,
-    requests,
     error,
     setError,
     reactions,
@@ -111,16 +109,6 @@ function MeetingRoom() {
                 <span className="w-2 h-2 bg-meet-red rounded-full" />
                 This meeting is being recorded
               </div>
-            )}
-            {requests.length > 0 && panel !== 'people' && (
-              <button
-                className="admission-banner"
-                onClick={() => setPanel('people')}
-              >
-                {requests.length}{' '}
-                {requests.length === 1 ? 'person is' : 'people are'} waiting to
-                join · Review
-              </button>
             )}
           </div>
           <MeetingPanels />

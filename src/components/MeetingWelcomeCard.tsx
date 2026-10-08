@@ -41,7 +41,11 @@ export default function MeetingWelcomeCard() {
       <p>Or share this meeting link with others you want in the meeting</p>
       <Clipboard value={`${window.location.origin}/${access.meetingId}`} />
       <div className="meeting-welcome-policy">
-        <span aria-hidden="true">♧</span>
+        <span aria-hidden="true">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M12 2 3 6v6c0 5 4 8 9 10 5-2 9-5 9-10V6L12 2Zm0 3 6 3v4c0 3-2 5-6 7-4-2-6-4-6-7V8l6-3Z" />
+          </svg>
+        </span>
         <p>
           {room.custom.locked === true
             ? 'This meeting is locked. Unlock it in Host controls to let new people join.'
