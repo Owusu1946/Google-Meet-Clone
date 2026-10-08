@@ -68,8 +68,11 @@ function useRoomState() {
   const [reactionPicker, setReactionPicker] = useState(false);
   const [menu, setMenu] = useState(false);
   const [whiteboard, setWhiteboard] = useState(false);
+  const wasBoardPresenting = useRef(custom.boardPresenting === true);
   useEffect(() => {
-    if (custom.boardPresenting === true) setWhiteboard(true);
+    if (wasBoardPresenting.current && custom.boardPresenting !== true)
+      setWhiteboard(false);
+    wasBoardPresenting.current = custom.boardPresenting === true;
   }, [custom.boardPresenting]);
   const [invite, setInvite] = useState(false);
   const [leavePrompt, setLeavePrompt] = useState(false);

@@ -70,6 +70,7 @@ export default function SmartWhiteboardOverlay({
   const custom = useCallCustomData();
   const { operations, send, loading, error, pending, retry, available } =
     useRoom().board;
+  const room = useRoom();
   const canDraw =
     available && !loading && (access.isHost || custom.collaboration !== false);
   const canvas = useRef<HTMLCanvasElement>(null);
@@ -157,6 +158,7 @@ export default function SmartWhiteboardOverlay({
     },
     [send],
   );
+  useEffect(() => () => flushDraft(true), [flushDraft]);
   useEffect(() => {
     if (!open) {
       flushDraft(true);
@@ -383,13 +385,20 @@ export default function SmartWhiteboardOverlay({
         >
           {Math.round(transform.scale * 100)}% · Reset
         </button>
-        <button
-          aria-label="Close whiteboard"
-          onClick={onClose}
-          className="ml-auto p-2 rounded-full hover:bg-light-gray"
-        >
-          <Close />
-        </button>
+        {(!custom.boardPresenting || access.isHost) && (
+          <button
+            disabled={room.busy}
+            aria-label={
+              custom.boardPresenting
+                ? 'Stop presenting whiteboard for everyone'
+                : 'Close whiteboard'
+            }
+            onClick={onClose}
+            className="ml-auto p-2 rounded-full hover:bg-light-gray"
+          >
+            {custom.boardPresenting ? 'Stop presenting' : <Close />}
+          </button>
+        )}
       </header>
       <div className="flex-1 min-h-0 relative bg-white">
         <canvas

@@ -10,7 +10,10 @@ import Settings from '@/components/icons/Settings';
 import Info from '@/components/icons/Info';
 import Apps from '@/components/icons/Apps';
 import PersonAdd from '@/components/icons/PersonAdd';
-import Videocam from '@/components/icons/Videocam';
+import {
+  RecordingsIcon,
+  PresentBoardIcon,
+} from '@/components/icons/MeetingActions';
 import Keep from '@/components/icons/Keep';
 
 export type MeetingAction = {
@@ -61,9 +64,14 @@ export default function useMeetingActions(): MeetingAction[] {
     },
     {
       id: 'board',
-      title: room.whiteboard ? 'Close whiteboard' : 'Open whiteboard',
+      title: room.custom.boardPresenting
+        ? 'Whiteboard is presenting to everyone'
+        : room.whiteboard
+          ? 'Close whiteboard'
+          : 'Open whiteboard',
       icon: <Brush />,
-      active: room.whiteboard,
+      active: room.whiteboard || room.custom.boardPresenting === true,
+      disabled: room.custom.boardPresenting === true,
       onClick: () => room.setWhiteboard((value) => !value),
     },
     {
@@ -116,7 +124,7 @@ export default function useMeetingActions(): MeetingAction[] {
       {
         id: 'recordings',
         title: 'Recordings',
-        icon: <Videocam />,
+        icon: <RecordingsIcon />,
         active: panel === 'recordings',
         onClick: () => togglePanel('recordings'),
       },
@@ -140,15 +148,19 @@ export default function useMeetingActions(): MeetingAction[] {
         title: room.custom.boardPresenting
           ? 'Stop presenting whiteboard'
           : 'Present whiteboard to everyone',
-        icon: <PresentToAll />,
+        icon: <PresentBoardIcon />,
         active: room.custom.boardPresenting === true,
         disabled: busy,
         onClick: () =>
-          void run(() =>
-            room.hostAction('settings', {
+          void run(async () => {
+            if (!(await room.board.flush()))
+              throw new Error(
+                'Save board edits before changing the presentation.',
+              );
+            await room.hostAction('settings', {
               boardPresenting: room.custom.boardPresenting !== true,
-            }),
-          ),
+            });
+          }),
       },
     );
   return actions;

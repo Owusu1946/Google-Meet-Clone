@@ -1,24 +1,36 @@
+import type { ReactNode } from 'react';
 import { hasScreenShare, ParticipantView } from '@stream-io/video-react-sdk';
 import { useRoom } from '@/contexts/MeetingRoomContext';
 import ParticipantViewUI from './ParticipantViewUI';
 import VideoPlaceholder from './VideoPlaceholder';
 
-export default function PresentationLayout() {
+export default function PresentationLayout({
+  content,
+}: {
+  content?: ReactNode;
+}) {
   const room = useRoom();
   const presenter = room.participants.find(hasScreenShare);
-  if (!presenter) return null;
+  if (!presenter && !content) return null;
   return (
     <div className="presentation-layout">
       <div
         className="presentation-screen"
-        aria-label={`${presenter.name || 'Participant'} is presenting`}
+        aria-label={
+          content
+            ? 'Shared whiteboard'
+            : `${presenter?.name || 'Participant'} is presenting`
+        }
       >
-        <ParticipantView
-          participant={presenter}
-          trackType="screenShareTrack"
-          muteAudio
-          ParticipantViewUI={() => null}
-        />
+        {content ||
+          (presenter && (
+            <ParticipantView
+              participant={presenter}
+              trackType="screenShareTrack"
+              muteAudio
+              ParticipantViewUI={() => null}
+            />
+          ))}
       </div>
       <div className="presentation-participants" aria-label="Participants">
         {room.participants.map((participant) => (

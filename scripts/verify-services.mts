@@ -194,6 +194,24 @@ try {
     applicant,
   );
   await request(`${path}/host`, host, { action: 'admit', userId: applicant });
+  await request(`${path}/host`, host, {
+    action: 'settings',
+    boardPresenting: true,
+  });
+  assert.equal((await call.get()).call.custom.boardPresenting, true);
+  await request(
+    `${path}/host`,
+    applicant,
+    { action: 'settings', boardPresenting: false },
+    403,
+  );
+  assert.equal((await call.get()).call.custom.boardPresenting, true);
+  await request(`${path}/host`, host, {
+    action: 'settings',
+    boardPresenting: false,
+  });
+  assert.equal((await call.get()).call.custom.boardPresenting, false);
+  checks += 3;
   // A new tab carries the browser's admitted legacy cookie, but must receive
   // a separate identity and remain outside the restricted call.
   const freshTab = await request(
