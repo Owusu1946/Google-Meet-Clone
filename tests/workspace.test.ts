@@ -196,3 +196,45 @@ test('presence rejects hostile cursors and unbounded selections', () => {
   );
   assert.equal(peerColor(actor), peerColor(actor));
 });
+import {
+  workspaceSnapshot,
+  parseWorkspaceSnapshot,
+  workspaceSvg,
+  workspaceBounds,
+} from '../src/lib/workspace-export';
+test('editable exports round-trip with fresh IDs and preserved frame/connector references', () => {
+  const items = workspaceTemplate('Architecture', actor, -100, 30);
+  const parsed = parseWorkspaceSnapshot(
+    workspaceSnapshot(items, []),
+    'guest_new',
+  );
+  assert.equal(parsed.objects.length, items.length);
+  assert.ok(parsed.objects.every((item) => item.id.startsWith('guest_new:')));
+  assert.ok(
+    parsed.objects.every((item) => !items.some((old) => old.id === item.id)),
+  );
+  const ids = new Set(parsed.objects.map((item) => item.id));
+  assert.ok(
+    parsed.objects
+      .filter((item) => item.type === 'connector')
+      .every((item) => ids.has(item.from!) && ids.has(item.to!)),
+  );
+});
+test('SVG exports escape text and use bounded dimensions while file imports reject unsafe data', () => {
+  const items = workspaceTemplate('Writing outline', actor, 0, 0);
+  items[1].text = '<script>alert("x")</script>';
+  const svg = workspaceSvg(items, []);
+  assert.ok(svg.includes('&lt;script&gt;'));
+  assert.equal(svg.includes('<script>'), false);
+  assert.ok(workspaceBounds(items, []).width > 0);
+  const bad = JSON.parse(workspaceSnapshot(items, []));
+  bad.objects[0].fields.width = Infinity;
+  assert.throws(
+    () => parseWorkspaceSnapshot(JSON.stringify(bad), actor),
+    /Invalid workspace object/,
+  );
+  assert.throws(
+    () => parseWorkspaceSnapshot('a'.repeat(2_000_001), actor),
+    /under 2 MB/,
+  );
+});

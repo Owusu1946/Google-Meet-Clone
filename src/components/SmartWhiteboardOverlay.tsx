@@ -22,6 +22,12 @@ import Dialog from './Dialog';
 import Close from './icons/Close';
 import useWorkspace from '@/hooks/useWorkspace';
 import WorkspaceScene from './WorkspaceScene';
+import {
+  workspaceBounds,
+  workspaceSvg,
+  workspaceSnapshot,
+  parseWorkspaceSnapshot,
+} from '@/lib/workspace-export';
 import { WORKSPACE_TEMPLATES } from '@/lib/workspace-layout';
 import { OBJECT_TYPES, type ObjectType } from '@/lib/workspace';
 
@@ -79,6 +85,8 @@ export default function SmartWhiteboardOverlay({
     available && !loading && (access.isHost || custom.collaboration !== false);
   const canvas = useRef<HTMLCanvasElement>(null);
   const workspace = useWorkspace();
+  const importFile = useRef<HTMLInputElement>(null);
+  const [fileError, setFileError] = useState('');
   const [tool, setTool] = useState<Tool>('select');
   const [color, setColor] = useState('#202124');
   const [width, setWidth] = useState(3);
@@ -268,7 +276,7 @@ export default function SmartWhiteboardOverlay({
       };
       setTransform((current) => {
         const scale = Math.max(
-          0.25,
+          0.05,
           Math.min(4, current.scale * Math.exp(-event.deltaY * 0.001)),
         );
         return {
@@ -280,43 +288,77 @@ export default function SmartWhiteboardOverlay({
     element.addEventListener('wheel', wheel, { passive: false });
     return () => element.removeEventListener('wheel', wheel);
   }, [open]);
-  const exportBoard = () => {
-    const points = strokes
-      .filter((stroke) => stroke.visible)
-      .flatMap((stroke) => stroke.points);
-    const bounds = points.reduce(
-      (value, point) => ({
-        minX: Math.min(value.minX, point.x),
-        minY: Math.min(value.minY, point.y),
-        maxX: Math.max(value.maxX, point.x),
-        maxY: Math.max(value.maxY, point.y),
-      }),
-      { minX: 0, minY: 0, maxX: 900, maxY: 600 },
+  const download = (blob: Blob, extension: string) => {
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement('a');
+    anchor.href = url;
+    anchor.download = `workspace-${access.meetingId}.${extension}`;
+    anchor.click();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  };
+  const exportBoard = async (format: string) => {
+    setFileError('');
+    try {
+      if (format === 'json') {
+        download(
+          new Blob([workspaceSnapshot(workspace.objects, strokes)], {
+            type: 'application/json',
+          }),
+          'json',
+        );
+        return;
+      }
+      const svg = new Blob([workspaceSvg(workspace.objects, strokes)], {
+        type: 'image/svg+xml',
+      });
+      if (format === 'svg') {
+        download(svg, 'svg');
+        return;
+      }
+      const image = new Image();
+      const url = URL.createObjectURL(svg);
+      try {
+        image.src = url;
+        await image.decode();
+        const drawing = document.createElement('canvas');
+        drawing.width = image.width;
+        drawing.height = image.height;
+        const context = drawing.getContext('2d');
+        if (!context) throw new Error('Image export is unavailable.');
+        context.drawImage(image, 0, 0);
+        const png = await new Promise<Blob>((resolve, reject) =>
+          drawing.toBlob(
+            (blob) =>
+              blob ? resolve(blob) : reject(new Error('Image export failed.')),
+            'image/png',
+          ),
+        );
+        download(png, 'png');
+      } finally {
+        URL.revokeObjectURL(url);
+      }
+    } catch (failure) {
+      setFileError(
+        failure instanceof Error ? failure.message : 'Export failed.',
+      );
+    }
+  };
+  const fit = () => {
+    const bounds = workspaceBounds(workspace.objects, strokes);
+    const scale = Math.max(
+      0.05,
+      Math.min(
+        2,
+        (size.width - 40) / bounds.width,
+        (size.height - 40) / bounds.height,
+      ),
     );
-    const { minX, minY, maxX, maxY } = {
-      minX: bounds.minX - 30,
-      minY: bounds.minY - 30,
-      maxX: bounds.maxX + 30,
-      maxY: bounds.maxY + 30,
-    };
-    const factor = Math.min(1, 4096 / (maxX - minX), 4096 / (maxY - minY));
-    const drawing = document.createElement('canvas');
-    drawing.width = Math.ceil((maxX - minX) * factor);
-    drawing.height = Math.ceil((maxY - minY) * factor);
-    const ctx = drawing.getContext('2d');
-    if (!ctx) return;
-    paint(ctx, strokes, factor, { x: -minX * factor, y: -minY * factor });
-    ctx.globalCompositeOperation = 'destination-over';
-    ctx.fillStyle = '#ffffff';
-    ctx.fillRect(0, 0, drawing.width, drawing.height);
-    drawing.toBlob((blob) => {
-      if (!blob) return;
-      const url = URL.createObjectURL(blob);
-      const anchor = document.createElement('a');
-      anchor.href = url;
-      anchor.download = `whiteboard-${access.meetingId}.png`;
-      anchor.click();
-      setTimeout(() => URL.revokeObjectURL(url), 1000);
+    setTransform({
+      scale,
+      offset: {
+        x: (size.width - bounds.width * scale) / 2 - bounds.x * scale,
+        y: (size.height - bounds.height * scale) / 2 - bounds.y * scale,
+      },
     });
   };
   if (!open) return null;
@@ -345,7 +387,7 @@ export default function SmartWhiteboardOverlay({
           onChange={(event) => setTool(event.target.value as Tool)}
         >
           <option value="" disabled>
-            Add object�
+            Add object...
           </option>
           {OBJECT_TYPES.filter((value) => value !== 'connector').map(
             (value) => (
@@ -376,7 +418,7 @@ export default function SmartWhiteboardOverlay({
           }}
         >
           <option value="" disabled>
-            Templates�
+            Templates...
           </option>
           {WORKSPACE_TEMPLATES.map((name) => (
             <option key={name}>{name}</option>
@@ -444,8 +486,99 @@ export default function SmartWhiteboardOverlay({
             Clear
           </button>
         )}
-        <button className="board-tool" onClick={exportBoard}>
-          Export
+        <select
+          className="board-tool"
+          aria-label="Export workspace"
+          value=""
+          onChange={(event) => void exportBoard(event.target.value)}
+        >
+          <option value="" disabled>
+            Export...
+          </option>
+          <option value="png">PNG image</option>
+          <option value="svg">SVG vector</option>
+          <option value="json">Editable workspace</option>
+        </select>
+        <button
+          className="board-tool"
+          disabled={!canDraw}
+          onClick={() => importFile.current?.click()}
+        >
+          Import
+        </button>
+        <input
+          ref={importFile}
+          type="file"
+          accept=".json,application/json"
+          className="hidden"
+          aria-label="Import workspace file"
+          onChange={async (event) => {
+            const file = event.target.files?.[0];
+            event.target.value = '';
+            if (!file) return;
+            setFileError('');
+            try {
+              if (file.size > 2_000_000)
+                throw new Error('Workspace files must be under 2 MB.');
+              const snapshot = parseWorkspaceSnapshot(
+                await file.text(),
+                access.identity.id,
+              );
+              workspace.createObjects(snapshot.objects);
+              for (const stroke of snapshot.strokes) {
+                const strokeId = `${access.identity.id}:${crypto.randomUUID()}`;
+                for (
+                  let segment = 0;
+                  segment * 80 < stroke.points.length;
+                  segment++
+                )
+                  send({
+                    kind: 'stroke',
+                    strokeId,
+                    segment,
+                    points: stroke.points.slice(
+                      segment * 80,
+                      (segment + 1) * 80,
+                    ),
+                    mode: stroke.mode,
+                    color: stroke.color,
+                    width: stroke.width,
+                  });
+              }
+              setTool('select');
+            } catch (failure) {
+              setFileError(
+                failure instanceof Error ? failure.message : 'Import failed.',
+              );
+            }
+          }}
+        />
+        <button className="board-tool" onClick={fit}>
+          Fit all
+        </button>
+        <button
+          className="board-tool"
+          aria-label="Zoom out"
+          onClick={() =>
+            setTransform((value) => ({
+              ...value,
+              scale: Math.max(0.05, value.scale / 1.2),
+            }))
+          }
+        >
+          -
+        </button>
+        <button
+          className="board-tool"
+          aria-label="Zoom in"
+          onClick={() =>
+            setTransform((value) => ({
+              ...value,
+              scale: Math.min(4, value.scale * 1.2),
+            }))
+          }
+        >
+          +
         </button>
         <button
           className="board-tool"
@@ -524,7 +657,7 @@ export default function SmartWhiteboardOverlay({
               ))}
             </select>
           </label>
-          <span>Double-click to edit � Shift-click to select more</span>
+          <span>Double-click to edit · Shift-click to select more</span>
         </div>
       )}
       <div className="flex-1 min-h-0 relative workspace-viewport">
@@ -554,12 +687,13 @@ export default function SmartWhiteboardOverlay({
         />
       </div>
       <footer className="px-4 py-2 text-xs bg-light-gray flex justify-between gap-3">
-        <span>
-          {loading
-            ? 'Loading shared board…'
-            : !canDraw
-              ? 'Only the host can draw'
-              : 'Draw with mouse, touch, or pen. Shift-drag to move. Ctrl/⌘-scroll to zoom.'}
+        <span role={fileError ? 'alert' : undefined}>
+          {fileError ||
+            (loading
+              ? 'Loading shared board…'
+              : !canDraw
+                ? 'Only the host can draw'
+                : 'Select objects, double-click to write, or connect nodes. Ctrl/⌘-scroll to zoom.')}
         </span>
         <span role="status">
           {error ? (
