@@ -38,13 +38,13 @@ export default function MeetingToolbar() {
     if (!element) return;
     const observer = new ResizeObserver(([entry]) => {
       const width = entry.contentRect.width;
-      // Reserve core controls, People/Chat, gaps and meeting metadata before extras.
+      // Equal side reserves keep controls centered without overlapping either side.
       setToolbarActionCount(
         width < 768
           ? 0
           : Math.max(
               0,
-              Math.floor((width - 312 - (width >= 1280 ? 240 : 0)) / 48),
+              Math.floor((width - 224 - 2 * (width >= 1280 ? 240 : 84)) / 48),
             ),
       );
     });
@@ -60,7 +60,7 @@ export default function MeetingToolbar() {
         <span>·</span>
         <span className="truncate">{access.meetingId}</span>
       </div>
-      <div className="flex items-center justify-center gap-2 shrink-0">
+      <div className="meeting-toolbar-controls flex items-center justify-center gap-2 shrink-0">
         <CallControlButton
           title={
             mic.optimisticIsMute ? 'Turn on microphone' : 'Turn off microphone'
@@ -97,7 +97,7 @@ export default function MeetingToolbar() {
           className="leave-call-button"
         />
       </div>
-      <div className="flex items-center gap-1">
+      <div className="meeting-toolbar-secondary flex items-center gap-1">
         <CallControlButton
           title={`People (${participants.length})`}
           icon={<Group />}

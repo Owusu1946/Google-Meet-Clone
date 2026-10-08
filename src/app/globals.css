@@ -60,9 +60,9 @@
   container-type: inline-size;
   min-height: 80px;
   padding: 12px 16px max(12px, env(safe-area-inset-bottom));
-  display: flex;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
   align-items: center;
-  justify-content: space-between;
   gap: 12px;
   flex-shrink: 0;
 }
@@ -218,6 +218,7 @@ input:focus-visible {
     padding: 8px 8px 0;
   }
   .meeting-toolbar {
+    display: flex;
     padding-left: 8px;
     padding-right: 8px;
     justify-content: center;
@@ -531,8 +532,10 @@ input:focus-visible {
 }
 
 .meeting-toolbar-info {
+  grid-column: 1;
+  min-width: 0;
   display: none;
-  width: 220px;
+  width: min(220px, 100%);
   flex-shrink: 0;
 }
 @container (min-width: 1280px) {
@@ -542,4 +545,13 @@ input:focus-visible {
 }
 .meeting-toolbar .call-control-button {
   flex-shrink: 0;
+}
+
+.meeting-toolbar-controls {
+  grid-column: 2;
+  justify-self: center;
+}
+.meeting-toolbar-secondary {
+  grid-column: 3;
+  justify-self: end;
 }
