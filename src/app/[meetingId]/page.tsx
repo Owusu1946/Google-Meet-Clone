@@ -1,9 +1,11 @@
 'use client';
 import Link from 'next/link';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useState, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useUser } from '@clerk/nextjs';
 import Header from '@/components/Header';
+import WaitingRoomIllustration from '@/components/WaitingRoomIllustration';
+import CallEndFilled from '@/components/icons/CallEndFilled';
 import MeetingPreview from '@/components/MeetingPreview';
 import {
   api,
@@ -21,6 +23,7 @@ export default function Lobby() {
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
   const [attempt, setAttempt] = useState(0);
+  const cancellingRequest = useRef(false);
   const valid = MEETING_ID_REGEX.test(meetingId);
   const refresh = useCallback(
     async (signal?: AbortSignal) => {
@@ -28,7 +31,7 @@ export default function Lobby() {
         `/api/meetings/${meetingId}/access`,
         { method: 'POST', body: '{}', signal },
       );
-      if (signal?.aborted) return next;
+      if (signal?.aborted || cancellingRequest.current) return next;
       setError('');
       setAccess(next);
       setName((current) => current || next.identity.name);
@@ -54,7 +57,11 @@ export default function Lobby() {
     const poll = async () => {
       try {
         const next = await refresh(controller.signal);
-        if (!cancelled && next.status === 'ready') {
+        if (
+          !cancelled &&
+          !cancellingRequest.current &&
+          next.status === 'ready'
+        ) {
           router.replace(`/${meetingId}/meeting`);
           return;
         }
@@ -93,6 +100,23 @@ export default function Lobby() {
       setBusy(false);
     }
   };
+  const cancelRequest = async () => {
+    if (busy) return;
+    cancellingRequest.current = true;
+    setBusy(true);
+    setError('');
+    try {
+      await api(`/api/meetings/${meetingId}/access`, {
+        method: 'POST',
+        body: JSON.stringify({ cancel: true }),
+      });
+      router.replace('/');
+    } catch (failure) {
+      cancellingRequest.current = false;
+      setBusy(false);
+      setError(errorMessage(failure));
+    }
+  };
   if (!valid)
     return (
       <>
@@ -107,12 +131,28 @@ export default function Lobby() {
     );
   const unavailable =
     access && ['denied', 'locked', 'ended'].includes(access.status);
+  const waiting = access?.status === 'waiting';
   return (
-    <div>
-      <Header navItems={false} />
+    <div className={waiting ? 'waiting-room' : 'lobby-page'}>
+      {!waiting && <Header navItems={false} />}
+      {waiting && (
+        <div className="waiting-room-message">
+          <WaitingRoomIllustration />
+          <h1>
+            <span className="waiting-spinner" aria-hidden="true" />
+            Please wait until a meeting host brings you into the call
+          </h1>
+          <p role="status">Your request has been sent to {access.hostName}.</p>
+        </div>
+      )}
       <main className="lobby-layout">
-        <MeetingPreview name={name || access?.identity.name || 'You'} />
-        <section className="lobby-join-panel">
+        <MeetingPreview
+          name={name || access?.identity.name || 'You'}
+          waiting={waiting}
+        />
+        <section
+          className={`lobby-join-panel ${waiting ? 'waiting-join-panel' : ''}`}
+        >
           <h1 className="text-3xl">
             {access?.status === 'waiting'
               ? 'Asking to join…'
@@ -199,9 +239,20 @@ export default function Lobby() {
               </button>
             </div>
           )}
-          <Link href="/" className="block text-primary text-sm">
-            Return home
-          </Link>
+          {waiting ? (
+            <button
+              className="waiting-leave"
+              aria-label="Cancel join request and return home"
+              disabled={busy}
+              onClick={() => void cancelRequest()}
+            >
+              <CallEndFilled />
+            </button>
+          ) : (
+            <Link href="/" className="block text-primary text-sm">
+              Return home
+            </Link>
+          )}
         </section>
       </main>
     </div>
