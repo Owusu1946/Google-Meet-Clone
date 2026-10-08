@@ -1,3 +1,4 @@
+import { prepareBoardOperations, type BoardInput } from '@/lib/board-input';
 import { createDraftBarrier } from '@/lib/draft-barrier';
 import {
   validPresence,
@@ -364,29 +365,24 @@ export default function useWhiteboard() {
       }
     })();
   }, []);
-  const send = useCallback(
-    (
-      input:
-        Omit<BoardOperation, 'actor' | 'time' | 'id'> | Record<string, unknown>,
-    ) => {
-      const operation = {
-        ...input,
-        id:
-          'id' in input && typeof input.id === 'string'
-            ? input.id
-            : crypto.randomUUID(),
-        actor: access.identity.id,
-        time: new Date().toISOString(),
-      };
-      if (!validOperation(operation)) return;
-      accept(operation);
-      preview(operation);
-      queue.current.push(operation);
+  const sendMany = useCallback(
+    (inputs: BoardInput[]) => {
+      const prepared = prepareBoardOperations(inputs, access.identity.id);
+      if (!prepared) return false;
+      if (!prepared.length) return true;
+      prepared.forEach(accept);
+      prepared.forEach(preview);
+      queue.current.push(...prepared);
       persist();
       setPending(queue.current.length);
       void flush();
+      return true;
     },
     [access.identity.id, accept, flush, persist, preview],
+  );
+  const send = useCallback(
+    (input: BoardInput) => sendMany([input]),
+    [sendMany],
   );
   useEffect(() => {
     const beforeUnload = (event: BeforeUnloadEvent) => {
@@ -427,6 +423,7 @@ export default function useWhiteboard() {
         preview(operation);
     },
     send,
+    sendMany,
     loading,
     error,
     pending,

@@ -1,4 +1,5 @@
 'use client';
+import type { BoardInput } from '@/lib/board-input';
 import {
   textEdit,
   insertedAtomIds,
@@ -53,7 +54,7 @@ export default function useWorkspace() {
   const commit = useCallback(
     (change: Change) => {
       if (!canEdit || !change.forward.length) return;
-      change.forward.forEach((op) => room.board.send(op));
+      if (!room.board.sendMany(change.forward)) return;
       undoStack.current.push(change);
       if (undoStack.current.length > 100) undoStack.current.shift();
       redoStack.current = [];
@@ -213,7 +214,10 @@ export default function useWorkspace() {
     if (!canEdit) return;
     const change = undoStack.current.pop();
     if (!change) return;
-    change.backward.forEach((op) => room.board.send(op));
+    if (!room.board.sendMany(change.backward)) {
+      undoStack.current.push(change);
+      return;
+    }
     redoStack.current.push(change);
     setHistoryVersion((value) => value + 1);
   };
@@ -221,23 +225,28 @@ export default function useWorkspace() {
     if (!canEdit) return;
     const change = redoStack.current.pop();
     if (!change) return;
+    const replay: BoardInput[] = [];
     change.forward.forEach((op) => {
       if (op.kind === 'text-insert' && 'id' in op) {
         const ids = insertedAtomIds(op.id, op.text);
         for (let index = 0; index < ids.length; index += 12)
-          room.board.send({
+          replay.push({
             kind: 'text-visible',
             objectId: op.objectId,
             atomIds: ids.slice(index, index + 12),
             visible: true,
           });
       } else
-        room.board.send(
+        replay.push(
           op.kind === 'object-create'
             ? { kind: 'object-visible', objectId: op.objectId, visible: true }
             : { ...op, id: crypto.randomUUID() },
         );
     });
+    if (!room.board.sendMany(replay)) {
+      redoStack.current.push(change);
+      return;
+    }
     undoStack.current.push(change);
     setHistoryVersion((value) => value + 1);
   };

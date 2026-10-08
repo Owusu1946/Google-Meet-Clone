@@ -1,4 +1,5 @@
 'use client';
+import type { BoardInput } from '@/lib/board-input';
 import {
   useCallback,
   useEffect,
@@ -78,8 +79,16 @@ export default function SmartWhiteboardOverlay({
   const { access } = useMeeting();
   const { useCallCustomData } = useCallStateHooks();
   const custom = useCallCustomData();
-  const { operations, send, loading, error, pending, retry, available } =
-    useRoom().board;
+  const {
+    operations,
+    send,
+    sendMany,
+    loading,
+    error,
+    pending,
+    retry,
+    available,
+  } = useRoom().board;
   const room = useRoom();
   const canDraw =
     available && !loading && (access.isHost || custom.collaboration !== false);
@@ -529,6 +538,7 @@ export default function SmartWhiteboardOverlay({
                 access.identity.id,
               );
               workspace.createObjects(snapshot.objects);
+              const importedInk: BoardInput[] = [];
               for (const stroke of snapshot.strokes) {
                 const strokeId = `${access.identity.id}:${crypto.randomUUID()}`;
                 for (
@@ -536,7 +546,7 @@ export default function SmartWhiteboardOverlay({
                   segment * 80 < stroke.points.length;
                   segment++
                 )
-                  send({
+                  importedInk.push({
                     kind: 'stroke',
                     strokeId,
                     segment,
@@ -549,6 +559,7 @@ export default function SmartWhiteboardOverlay({
                     width: stroke.width,
                   });
               }
+              sendMany(importedInk);
               setTool('select');
             } catch (failure) {
               setFileError(
