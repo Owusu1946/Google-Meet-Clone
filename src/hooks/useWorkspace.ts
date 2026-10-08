@@ -1,4 +1,5 @@
 'use client';
+import { boardEpoch } from '@/lib/board-epoch';
 import {
   workspaceCreation,
   workspaceRedo,
@@ -6,7 +7,7 @@ import {
 } from '@/lib/workspace-changes';
 import { textEdit } from '@/lib/workspace-text';
 import type { BoardOperation, BoardStroke } from '@/lib/whiteboard';
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRoom } from '@/contexts/MeetingRoomContext';
 import {
   workspaceObjects,
@@ -40,6 +41,36 @@ export default function useWorkspace() {
   const undoStack = useRef<WorkspaceChange[]>([]);
   const redoStack = useRef<WorkspaceChange[]>([]);
   const [historyVersion, setHistoryVersion] = useState(0);
+  const epoch = useMemo(
+    () => boardEpoch(room.board.operations),
+    [room.board.operations],
+  );
+  const historyEpoch = useRef(epoch);
+  useEffect(() => {
+    if (historyEpoch.current === epoch) return;
+    historyEpoch.current = epoch;
+    undoStack.current = [];
+    redoStack.current = [];
+    setHistoryVersion((value) => value + 1);
+    setSelected([]);
+    setDrafts({});
+  }, [epoch]);
+  useEffect(() => {
+    const visible = new Set(
+      storedObjects.filter((item) => item.visible).map((item) => item.id),
+    );
+    setSelected((current) => {
+      const next = current.filter((id) => visible.has(id));
+      return next.length === current.length ? current : next;
+    });
+    setDrafts((current) => {
+      const entries = Object.entries(current).filter(([id]) => visible.has(id));
+      return entries.length === Object.keys(current).length
+        ? current
+        : Object.fromEntries(entries);
+    });
+  }, [storedObjects]);
+
   const canEdit =
     room.board.available &&
     !room.board.loading &&
@@ -48,13 +79,18 @@ export default function useWorkspace() {
     (change: WorkspaceChange) => {
       if (!canEdit || !change.forward.length) return false;
       if (!room.board.sendMany(change.forward)) return false;
+      if (historyEpoch.current !== epoch) {
+        historyEpoch.current = epoch;
+        undoStack.current = [];
+        redoStack.current = [];
+      }
       undoStack.current.push(change);
       if (undoStack.current.length > 100) undoStack.current.shift();
       redoStack.current = [];
       setHistoryVersion((value) => value + 1);
       return true;
     },
-    [canEdit, room.board],
+    [canEdit, room.board, epoch],
   );
   const createObjects = (
     items: WorkspaceObject[],
@@ -183,7 +219,7 @@ export default function useWorkspace() {
     );
   };
   const undo = () => {
-    if (!canEdit) return;
+    if (!canEdit || historyEpoch.current !== epoch) return;
     const change = undoStack.current.pop();
     if (!change) return;
     if (!room.board.sendMany(change.backward)) {
@@ -194,7 +230,7 @@ export default function useWorkspace() {
     setHistoryVersion((value) => value + 1);
   };
   const redo = () => {
-    if (!canEdit) return;
+    if (!canEdit || historyEpoch.current !== epoch) return;
     const change = redoStack.current.pop();
     if (!change) return;
     const replay = workspaceRedo(change);
@@ -311,6 +347,7 @@ export default function useWorkspace() {
   void historyVersion;
   return {
     objects,
+    epoch,
     rendered: objects.map((item) => ({ ...item, ...drafts[item.id] })),
     selected,
     setSelected,

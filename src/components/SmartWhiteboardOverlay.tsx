@@ -106,6 +106,17 @@ export default function SmartWhiteboardOverlay({
   const lastFlush = useRef(0);
   const pan = useRef<{ point: Point; offset: Point } | undefined>(undefined);
   const [clearPrompt, setClearPrompt] = useState(false);
+  const drawingEpoch = useRef(workspace.epoch);
+  useEffect(() => {
+    if (drawingEpoch.current === workspace.epoch) return;
+    drawingEpoch.current = workspace.epoch;
+    active.current = undefined;
+    pan.current = undefined;
+    sent.current = 0;
+    segment.current = 0;
+    setDraft(undefined);
+  }, [workspace.epoch]);
+
   const strokes = useMemo(() => boardStrokes(operations), [operations]);
   const lastOwn = [...strokes]
     .reverse()

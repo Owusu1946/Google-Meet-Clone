@@ -156,6 +156,41 @@ export default function WorkspaceScene({
   }, [editRequest]);
 
   const sharedText = objects.find((item) => item.id === editing)?.text;
+  const interactionEpoch = useRef(model.epoch);
+  useEffect(() => {
+    if (interactionEpoch.current !== model.epoch) {
+      interactionEpoch.current = model.epoch;
+      selectionDrag.current = undefined;
+      setSelectionBox(undefined);
+      setConnectFrom('');
+    } else if (
+      connectFrom &&
+      !model.objects.some((item) => item.id === connectFrom && item.visible)
+    ) {
+      setConnectFrom('');
+    }
+    if (editing && sharedText === undefined) {
+      clearTimeout(textTimer.current);
+      textPending.current = undefined;
+      setEditing('');
+      setText('');
+    }
+    const current = gesture.current;
+    if (
+      current &&
+      current.originals.some(
+        (original) =>
+          !model.objects.some(
+            (item) => item.id === original.id && item.visible,
+          ),
+      )
+    ) {
+      gesture.current = undefined;
+      setResize(undefined);
+      model.cancelMove();
+    }
+  }, [editing, sharedText, connectFrom, model]);
+
   useEffect(() => {
     if (editing && sharedText !== undefined && !textPending.current) {
       setText(sharedText);
