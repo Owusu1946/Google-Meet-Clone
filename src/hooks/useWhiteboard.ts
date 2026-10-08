@@ -402,6 +402,10 @@ export default function useWhiteboard() {
     };
   }, [draftBarrier, persist]);
   return {
+    getOperations: () =>
+      [...previewsStore.current.values()]
+        .map((value) => value.operation)
+        .concat([...stored.current.values()]),
     operations,
     registerDraft: draftBarrier.register,
     peers,

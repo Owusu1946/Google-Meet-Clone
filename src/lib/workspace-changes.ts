@@ -1,6 +1,7 @@
 import type { BoardInput } from './board-input';
 import type { BoardOperation, BoardStroke } from './whiteboard';
 import {
+  compareOperations,
   objectFields,
   textSeed,
   type WorkspaceObject,
@@ -95,4 +96,42 @@ export function workspaceRedo(change: WorkspaceChange): BoardInput[] {
       );
   }
   return replay;
+}
+
+// Undo only properties still owned by this edit, including same-valued peer writes.
+export function selectiveWorkspaceChange(
+  change: WorkspaceChange,
+  expected: BoardOperation[],
+  current: BoardOperation[],
+): WorkspaceChange {
+  const owners = new Map<string, string>();
+  const key = (id: string, field: string) => JSON.stringify([id, field]);
+  for (const op of [...current].sort(compareOperations)) {
+    if (op.kind === 'clear') owners.clear();
+    if (op.kind === 'object-create' || op.kind === 'object-patch')
+      for (const field of Object.keys(op.fields))
+        owners.set(key(op.objectId, field), op.id);
+  }
+  const allowed = new Set<string>();
+  for (const op of expected)
+    if (op.kind === 'object-patch')
+      for (const field of Object.keys(op.fields))
+        if (owners.get(key(op.objectId, field)) === op.id)
+          allowed.add(key(op.objectId, field));
+  const filter = <
+    T extends
+      WorkspaceChange['forward'][number] | WorkspaceChange['backward'][number],
+  >(
+    ops: T[],
+  ): T[] =>
+    ops.flatMap((op) => {
+      if (op.kind !== 'object-patch') return [op];
+      const fields = Object.fromEntries(
+        Object.entries(op.fields).filter(([field]) =>
+          allowed.has(key(op.objectId, field)),
+        ),
+      );
+      return Object.keys(fields).length ? [{ ...op, fields } as T] : [];
+    });
+  return { forward: filter(change.forward), backward: filter(change.backward) };
 }

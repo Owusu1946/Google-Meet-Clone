@@ -99,3 +99,5 @@ Record browser/device, scenario number, expected/actual result, and console/serv
 43. Import a workspace containing frames, connected nodes, long text and multi-segment drawings into a board that already has content. One workspace Undo must hide all imported objects and ink while retaining existing content; Redo must restore the import without duplicate text or strokes. Undo again and compare both clients. Repeat with a drawing-only file.
 
 44. Clear while another participant is drawing, editing text, making a connection or dragging a selection box. Active interactions must stop when Clear applies, old undo/redo must be retired, and no stale editor or selection should remain. Delete an object remotely while someone edits or drags it; its editor/drag/connection state must close safely. New work after Clear gets a fresh undo history, including after acknowledgement and reconnect.
+
+45. With two collaborators, move an object, then have the other person change only its horizontal position or color. Undo and redo the first edit: the other person's later properties must remain. Repeat after the other person edits a property between Undo and Redo.

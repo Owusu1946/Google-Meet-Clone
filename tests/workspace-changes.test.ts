@@ -1,7 +1,11 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
-import { workspaceCreation, workspaceRedo } from '../src/lib/workspace-changes';
+import {
+  selectiveWorkspaceChange,
+  workspaceCreation,
+  workspaceRedo,
+} from '../src/lib/workspace-changes';
 import {
   prepareBoardOperations,
   type BoardInput,
@@ -99,4 +103,66 @@ test('drawing-only imports have a reversible workspace change', () => {
   assert.equal(change.backward[0].kind, 'visibility');
   assert.ok(prepareBoardOperations(change.forward, actor));
   assert.ok(prepareBoardOperations(change.backward, actor));
+});
+
+test('selective object undo and redo preserve later peer property writes', () => {
+  const make = (
+    fields: Record<string, number>,
+    time: number,
+    actor = 'alice',
+  ) => ({
+    id: randomUUID(),
+    actor,
+    time: new Date(time).toISOString(),
+    kind: 'object-patch' as const,
+    objectId: 'alice:object',
+    fields,
+  });
+  const own = make({ x: 100, y: 100 }, 1);
+  const peer = make({ x: 100 }, 2, 'bob');
+  const change = {
+    forward: [own],
+    backward: [
+      {
+        kind: 'object-patch' as const,
+        objectId: own.objectId,
+        fields: { x: 0, y: 0 },
+      },
+    ],
+  };
+  const undo = selectiveWorkspaceChange(change, [own], [peer, own]);
+  assert.deepEqual(undo.backward, [
+    { kind: 'object-patch', objectId: own.objectId, fields: { y: 0 } },
+  ]);
+  const appliedUndo = make({ y: 0 }, 3);
+  assert.deepEqual(
+    selectiveWorkspaceChange(undo, [appliedUndo], [own, peer, appliedUndo])
+      .forward[0],
+    { ...own, fields: { y: 100 } },
+  );
+  const laterPeer = make({ y: 0 }, 4, 'bob');
+  assert.deepEqual(
+    selectiveWorkspaceChange(
+      undo,
+      [appliedUndo],
+      [laterPeer, own, appliedUndo, peer],
+    ),
+    { forward: [], backward: [] },
+  );
+  assert.deepEqual(
+    selectiveWorkspaceChange(
+      change,
+      [own],
+      [
+        own,
+        {
+          id: randomUUID(),
+          actor: 'bob',
+          time: new Date(5).toISOString(),
+          kind: 'clear',
+        },
+      ],
+    ),
+    { forward: [], backward: [] },
+  );
 });

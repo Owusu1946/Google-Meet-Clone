@@ -1,6 +1,8 @@
 'use client';
+import { prepareBoardOperations } from '@/lib/board-input';
 import { boardEpoch } from '@/lib/board-epoch';
 import {
+  selectiveWorkspaceChange,
   workspaceCreation,
   workspaceRedo,
   type WorkspaceChange,
@@ -39,7 +41,9 @@ export default function useWorkspace() {
     {},
   );
   const undoStack = useRef<WorkspaceChange[]>([]);
-  const redoStack = useRef<WorkspaceChange[]>([]);
+  const redoStack = useRef<
+    { change: WorkspaceChange; appliedUndo: BoardOperation[] }[]
+  >([]);
   const [historyVersion, setHistoryVersion] = useState(0);
   const epoch = useMemo(
     () => boardEpoch(room.board.operations),
@@ -78,19 +82,23 @@ export default function useWorkspace() {
   const commit = useCallback(
     (change: WorkspaceChange) => {
       if (!canEdit || !change.forward.length) return false;
-      if (!room.board.sendMany(change.forward)) return false;
+      const forward = prepareBoardOperations(
+        change.forward,
+        room.access.identity.id,
+      );
+      if (!forward || !room.board.sendMany(forward)) return false;
       if (historyEpoch.current !== epoch) {
         historyEpoch.current = epoch;
         undoStack.current = [];
         redoStack.current = [];
       }
-      undoStack.current.push(change);
+      undoStack.current.push({ ...change, forward });
       if (undoStack.current.length > 100) undoStack.current.shift();
       redoStack.current = [];
       setHistoryVersion((value) => value + 1);
       return true;
     },
-    [canEdit, room.board, epoch],
+    [canEdit, room.board, room.access.identity.id, epoch],
   );
   const createObjects = (
     items: WorkspaceObject[],
@@ -222,23 +230,41 @@ export default function useWorkspace() {
     if (!canEdit || historyEpoch.current !== epoch) return;
     const change = undoStack.current.pop();
     if (!change) return;
-    if (!room.board.sendMany(change.backward)) {
+    const trimmed = selectiveWorkspaceChange(
+      change,
+      change.forward as BoardOperation[],
+      room.board.getOperations(),
+    );
+    const appliedUndo = prepareBoardOperations(
+      trimmed.backward,
+      room.access.identity.id,
+    );
+    if (!appliedUndo || !room.board.sendMany(appliedUndo)) {
       undoStack.current.push(change);
       return;
     }
-    redoStack.current.push(change);
+    if (appliedUndo.length)
+      redoStack.current.push({ change: trimmed, appliedUndo });
     setHistoryVersion((value) => value + 1);
   };
   const redo = () => {
     if (!canEdit || historyEpoch.current !== epoch) return;
-    const change = redoStack.current.pop();
-    if (!change) return;
-    const replay = workspaceRedo(change);
-    if (!room.board.sendMany(replay)) {
-      redoStack.current.push(change);
+    const entry = redoStack.current.pop();
+    if (!entry) return;
+    const change = selectiveWorkspaceChange(
+      entry.change,
+      entry.appliedUndo,
+      room.board.getOperations(),
+    );
+    const replay = prepareBoardOperations(
+      workspaceRedo(change),
+      room.access.identity.id,
+    );
+    if (!replay || !room.board.sendMany(replay)) {
+      redoStack.current.push(entry);
       return;
     }
-    undoStack.current.push(change);
+    if (replay.length) undoStack.current.push({ ...change, forward: replay });
     setHistoryVersion((value) => value + 1);
   };
   const move = (
