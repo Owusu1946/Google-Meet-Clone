@@ -64,9 +64,14 @@ export default function useMeetingActions(): MeetingAction[] {
     },
     {
       id: 'board',
-      title: room.whiteboard ? 'Close whiteboard' : 'Open whiteboard',
+      title: room.custom.boardPresenting
+        ? 'Whiteboard is presenting to everyone'
+        : room.whiteboard
+          ? 'Close whiteboard'
+          : 'Open whiteboard',
       icon: <Brush />,
-      active: room.whiteboard,
+      active: room.whiteboard || room.custom.boardPresenting === true,
+      disabled: room.custom.boardPresenting === true,
       onClick: () => room.setWhiteboard((value) => !value),
     },
     {
@@ -147,11 +152,15 @@ export default function useMeetingActions(): MeetingAction[] {
         active: room.custom.boardPresenting === true,
         disabled: busy,
         onClick: () =>
-          void run(() =>
-            room.hostAction('settings', {
+          void run(async () => {
+            if (!(await room.board.flush()))
+              throw new Error(
+                'Save board edits before changing the presentation.',
+              );
+            await room.hostAction('settings', {
               boardPresenting: room.custom.boardPresenting !== true,
-            }),
-          ),
+            });
+          }),
       },
     );
   return actions;

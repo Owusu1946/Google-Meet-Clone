@@ -69,7 +69,28 @@ function MeetingRoom() {
         <main className={`meeting-content ${panel ? 'has-panel' : ''}`}>
           <div className="meeting-stage">
             <RaisedHandsProvider value={{ raisedUserIds }}>
-              {pip.pip ? (
+              {whiteboard || room.custom.boardPresenting === true ? (
+                <PresentationLayout
+                  content={
+                    <SmartWhiteboardOverlay
+                      open
+                      onClose={() => {
+                        if (room.custom.boardPresenting === true) {
+                          void room.run(async () => {
+                            if (!(await room.board.flush()))
+                              throw new Error(
+                                'Save board edits before stopping the presentation.',
+                              );
+                            await room.hostAction('settings', {
+                              boardPresenting: false,
+                            });
+                          });
+                        } else setWhiteboard(false);
+                      }}
+                    />
+                  }
+                />
+              ) : pip.pip ? (
                 <div className="presenter-pip-placeholder">
                   <PresentingIcon />
                   <h2>Picture-in-picture is open while you’re presenting</h2>
@@ -88,18 +109,6 @@ function MeetingRoom() {
                 <GridLayout />
               )}
             </RaisedHandsProvider>
-            {room.custom.boardPresenting === true && !whiteboard && (
-              <button
-                className="admission-banner"
-                onClick={() => setWhiteboard(true)}
-              >
-                The host is presenting the whiteboard · Open
-              </button>
-            )}
-            <SmartWhiteboardOverlay
-              open={whiteboard}
-              onClose={() => setWhiteboard(false)}
-            />
             {showCaptions && <CaptionsOverlay {...captions} />}
             {[
               CallingState.RECONNECTING,
