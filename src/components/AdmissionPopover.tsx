@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useRoom } from '@/contexts/MeetingRoomContext';
 import PersonAdd from './icons/PersonAdd';
+import AdmitAllButton from './AdmitAllButton';
 export default function AdmissionPopover() {
   const room = useRoom();
   const [open, setOpen] = useState(false);
@@ -19,6 +20,7 @@ export default function AdmissionPopover() {
     };
     const escape = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
+        if (document.querySelector('dialog[open]')) return;
         setOpen(false);
         trigger.current?.focus();
       }
@@ -57,6 +59,7 @@ export default function AdmissionPopover() {
             <span>Visible to hosts</span>
           </div>
           <div className="admission-request-list">
+            <AdmitAllButton />
             {room.requests.slice(0, 5).map((request) => (
               <div key={request.id} className="admission-request">
                 <div className="admission-person">
