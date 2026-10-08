@@ -1,4 +1,5 @@
 'use client';
+import { playMeetingSound, unlockMeetingSounds } from '@/lib/meeting-sounds';
 import { leaveCallOnce } from '@/lib/leave-call';
 import {
   createContext,
@@ -80,6 +81,35 @@ function useRoomState() {
   const [busy, setBusy] = useState(false);
   const inFlight = useRef(false);
   const [requests, setRequests] = useState<JoinRequest[]>([]);
+  const previousRequests = useRef(new Set<string>());
+  const previousParticipants = useRef<Set<string> | null>(null);
+  useEffect(() => {
+    const unlock = () => unlockMeetingSounds();
+    window.addEventListener('pointerdown', unlock);
+    window.addEventListener('keydown', unlock);
+    return () => {
+      window.removeEventListener('pointerdown', unlock);
+      window.removeEventListener('keydown', unlock);
+    };
+  }, []);
+  useEffect(() => {
+    const current = new Set(
+      participants.map((participant) => participant.sessionId),
+    );
+    const previous = previousParticipants.current;
+    if (
+      previous &&
+      !leaving.current &&
+      !endedAt &&
+      state === CallingState.JOINED
+    ) {
+      if ([...current].some((id) => !previous.has(id)))
+        playMeetingSound('join');
+      else if ([...previous].some((id) => !current.has(id)))
+        playMeetingSound('leave');
+    }
+    previousParticipants.current = current;
+  }, [participants, endedAt, state]);
   const [requestError, setRequestError] = useState('');
   const [unread, setUnread] = useState(0);
   const reactions = useReactions();
@@ -191,6 +221,14 @@ function useRoomState() {
           { signal: controller.signal },
         );
         if (!cancelled) {
+          const current = new Set(
+            result.requests.map(
+              (request) => `${request.id}:${request.requestedAt}`,
+            ),
+          );
+          if ([...current].some((id) => !previousRequests.current.has(id)))
+            playMeetingSound('request');
+          previousRequests.current = current;
           setRequests(result.requests);
           setRequestError('');
         }
@@ -275,6 +313,7 @@ function useRoomState() {
     if (leaving.current) return;
     if (endedAt || state === CallingState.LEFT) {
       leaving.current = true;
+      playMeetingSound(endedAt ? 'end' : 'leave');
       router.replace(
         `/${access.meetingId}/meeting-end?reason=${endedAt ? 'ended' : 'disconnected'}`,
       );
@@ -295,6 +334,7 @@ function useRoomState() {
           body: JSON.stringify({ raised: false, sessionId: local.sessionId }),
         }).catch(() => undefined);
       await leaveCallOnce(call, end);
+      playMeetingSound(end ? 'end' : 'leave');
       setLeavePrompt(false);
       setPanel(null);
       router.replace(

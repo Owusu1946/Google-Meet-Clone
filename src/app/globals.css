@@ -2181,3 +2181,18 @@ input:focus-visible {
 .people-summary-avatars.single .avatar > div {
   font-size: 14px;
 }
+.people-summary-avatars {
+  width: 30px;
+  height: 30px;
+  flex: 0 0 30px;
+  grid-template-rows: repeat(2, 14px);
+  place-items: center;
+}
+.people-summary-avatars.single {
+  grid-template-rows: 28px;
+}
+.meeting-participant-pill {
+  height: 40px;
+  gap: 10px;
+  padding: 5px 14px 5px 8px;
+}
