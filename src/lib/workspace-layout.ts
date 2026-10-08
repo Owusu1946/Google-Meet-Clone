@@ -131,15 +131,21 @@ export function frameDescendants(
   id: string,
   objects: WorkspaceObject[],
 ): WorkspaceObject[] {
+  const children = new Map<string, string[]>();
+  for (const object of objects) {
+    if (!object.parentId) continue;
+    const siblings = children.get(object.parentId) || [];
+    siblings.push(object.id);
+    children.set(object.parentId, siblings);
+  }
   const ids = new Set([id]);
-  for (let pass = 0; pass < objects.length; pass++) {
-    let changed = false;
-    for (const object of objects)
-      if (object.parentId && ids.has(object.parentId) && !ids.has(object.id)) {
-        ids.add(object.id);
-        changed = true;
-      }
-    if (!changed) break;
+  const queue = [id];
+  for (let index = 0; index < queue.length; index++) {
+    for (const child of children.get(queue[index]) || []) {
+      if (ids.has(child)) continue;
+      ids.add(child);
+      queue.push(child);
+    }
   }
   return objects.filter((object) => ids.has(object.id) && object.visible);
 }
@@ -168,4 +174,40 @@ export function containingFrame(
         center.y <= item.y + item.height,
     )
     .sort((a, b) => a.width * a.height - b.width * b.height)[0];
+}
+
+// Select only fully enclosed objects so dragging across a large frame does not
+// accidentally select the frame and move everything inside it.
+export function objectsInSelection(
+  start: { x: number; y: number },
+  end: { x: number; y: number },
+  objects: WorkspaceObject[],
+) {
+  const left = Math.min(start.x, end.x);
+  const top = Math.min(start.y, end.y);
+  const right = Math.max(start.x, end.x);
+  const bottom = Math.max(start.y, end.y);
+  return objects
+    .filter(
+      (object) =>
+        object.visible &&
+        object.type !== 'connector' &&
+        object.x >= left &&
+        object.y >= top &&
+        object.x + object.width <= right &&
+        object.y + object.height <= bottom,
+    )
+    .map((object) => object.id);
+}
+
+export function movableSelection(ids: string[], objects: WorkspaceObject[]) {
+  const selected = new Set(
+    ids.flatMap((id) =>
+      frameDescendants(id, objects).map((object) => object.id),
+    ),
+  );
+  return objects.filter(
+    (object) =>
+      object.visible && object.type !== 'connector' && selected.has(object.id),
+  );
 }

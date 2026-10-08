@@ -330,3 +330,42 @@ test('text deletion preserves concurrent descendants, emoji and long insert chun
     false,
   );
 });
+
+import {
+  objectsInSelection,
+  movableSelection,
+} from '../src/lib/workspace-layout';
+
+test('marquee selection works in either direction and excludes partially enclosed frames', () => {
+  const items = workspaceTemplate('Writing outline', actor, 0, 0);
+  const text = items[1];
+  const start = { x: text.x - 1, y: text.y - 1 };
+  const end = { x: text.x + text.width + 1, y: text.y + text.height + 1 };
+  assert.deepEqual(objectsInSelection(start, end, items), [text.id]);
+  assert.deepEqual(objectsInSelection(end, start, items), [text.id]);
+  assert.deepEqual(objectsInSelection(start, start, items), []);
+  assert.deepEqual(
+    objectsInSelection(
+      start,
+      end,
+      items.map((item) => ({ ...item, visible: false })),
+    ),
+    [],
+  );
+});
+
+test('keyboard and pointer movement include nested contents exactly once without moving connectors', () => {
+  const items = workspaceTemplate('Writing outline', actor, 0, 0);
+  const frame = items[0];
+  const selected = movableSelection([frame.id, items[1].id, frame.id], items);
+  assert.equal(selected.length, items.length);
+  assert.equal(new Set(selected.map((item) => item.id)).size, items.length);
+  const diagram = workspaceTemplate('Architecture', actor, 0, 0);
+  assert.equal(
+    movableSelection(
+      diagram.map((item) => item.id),
+      diagram,
+    ).some((item) => item.type === 'connector'),
+    false,
+  );
+});

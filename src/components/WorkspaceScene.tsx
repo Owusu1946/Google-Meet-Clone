@@ -9,7 +9,7 @@ import {
 } from '@/lib/workspace';
 import { textDocument } from '@/lib/workspace-text';
 import { peerColor } from '@/lib/workspace-presence';
-import { frameDescendants } from '@/lib/workspace-layout';
+import { movableSelection, objectsInSelection } from '@/lib/workspace-layout';
 import { type BoardOperation, type Point, viewToWorld } from '@/lib/whiteboard';
 
 type Workspace = ReturnType<typeof useWorkspace>;
@@ -37,6 +37,18 @@ export default function WorkspaceScene({
   const root = useRef<HTMLDivElement>(null);
   const gesture = useRef<Gesture | undefined>(undefined);
   const [editing, setEditing] = useState('');
+  const selectionDrag = useRef<
+    | {
+        start: Point;
+        end: Point;
+        previous: string[];
+      }
+    | undefined
+  >(undefined);
+  const [selectionBox, setSelectionBox] = useState<{
+    start: Point;
+    end: Point;
+  }>();
   const [text, setText] = useState('');
   const textTimer = useRef<ReturnType<typeof setTimeout> | undefined>(
     undefined,
@@ -189,18 +201,9 @@ export default function WorkspaceScene({
     model.setSelected(selection);
     if (!model.canEdit) return;
     root.current!.setPointerCapture(event.pointerId);
-    const movingIds = new Set(
-      selection.flatMap((id) =>
-        frameDescendants(id, objects).map((child) => child.id),
-      ),
-    );
     gesture.current = {
       point: world(event),
-      originals: resizing
-        ? [item]
-        : objects.filter(
-            (child) => movingIds.has(child.id) && child.type !== 'connector',
-          ),
+      originals: resizing ? [item] : movableSelection(selection, objects),
       resize: resizing,
       last: 0,
       dx: 0,
@@ -212,6 +215,18 @@ export default function WorkspaceScene({
     if (performance.now() - presenceAt.current > 80) {
       presenceAt.current = performance.now();
       announceRef.current();
+    }
+    const selecting = selectionDrag.current;
+    if (selecting) {
+      selecting.end = world(event);
+      setSelectionBox({ start: selecting.start, end: selecting.end });
+      model.setSelected([
+        ...new Set([
+          ...selecting.previous,
+          ...objectsInSelection(selecting.start, selecting.end, objects),
+        ]),
+      ]);
+      return;
     }
     const current = gesture.current;
     if (!current) return;
@@ -246,6 +261,8 @@ export default function WorkspaceScene({
     }
   };
   const finish = () => {
+    selectionDrag.current = undefined;
+    setSelectionBox(undefined);
     const current = gesture.current;
     if (!current) return;
     gesture.current = undefined;
@@ -278,7 +295,17 @@ export default function WorkspaceScene({
           model.create(tool as ObjectType, point.x, point.y);
           onTool('select');
         } else {
-          model.setSelected([]);
+          if (tool === 'select') {
+            const point = world(event);
+            selectionDrag.current = {
+              start: point,
+              end: point,
+              previous: event.shiftKey ? model.selected : [],
+            };
+            setSelectionBox({ start: point, end: point });
+            root.current!.setPointerCapture(event.pointerId);
+          }
+          if (!event.shiftKey) model.setSelected([]);
           setConnectFrom('');
         }
       }}
@@ -304,6 +331,8 @@ export default function WorkspaceScene({
         if (event.key === 'Escape') {
           flushText();
           setEditing('');
+          selectionDrag.current = undefined;
+          setSelectionBox(undefined);
           model.setSelected([]);
           setConnectFrom('');
           onTool('select');
@@ -345,7 +374,7 @@ export default function WorkspaceScene({
           event.preventDefault();
           const amount = event.shiftKey ? 10 : 1;
           model.move(
-            objects.filter((item) => model.selected.includes(item.id)),
+            movableSelection(model.selected, objects),
             delta[event.key].x * amount,
             delta[event.key].y * amount,
             true,
@@ -359,6 +388,22 @@ export default function WorkspaceScene({
           transform: `translate(${transform.offset.x}px, ${transform.offset.y}px) scale(${transform.scale})`,
         }}
       >
+        {selectionBox && (
+          <div
+            aria-hidden="true"
+            style={{
+              position: 'absolute',
+              pointerEvents: 'none',
+              zIndex: 10,
+              left: Math.min(selectionBox.start.x, selectionBox.end.x),
+              top: Math.min(selectionBox.start.y, selectionBox.end.y),
+              width: Math.abs(selectionBox.end.x - selectionBox.start.x),
+              height: Math.abs(selectionBox.end.y - selectionBox.start.y),
+              border: `${1 / transform.scale}px solid #1a73e8`,
+              background: '#1a73e81a',
+            }}
+          />
+        )}
         <svg className="workspace-connections" aria-label="Connections">
           <defs>
             <marker
