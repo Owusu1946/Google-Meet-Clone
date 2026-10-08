@@ -115,3 +115,5 @@ Record browser/device, scenario number, expected/actual result, and console/serv
 51. Double-click a connector, press F2 while it is focused, or select Edit content to edit its label. Verify concurrent label writing, save on blur/Escape, Undo/Redo, remote deletion closing the editor, and label preservation in JSON/SVG/PNG exports.
 
 52. Export a diagram with curved, labeled connectors to SVG/PNG. Curves and labels should match the live board, including labels containing <, > and &. Delete an endpoint and verify the orphaned connection and its label disappear from the export.
+
+53. Disconnect the network after a board edit queues, then reconnect without typing or pressing Retry. Pending object/text/ink edits must retry automatically and converge for collaborators. Repeat while an HTTP save is failing as the connection recovers; no edits should be dropped or duplicated. Verify the pending indicator clears only after acknowledgement.

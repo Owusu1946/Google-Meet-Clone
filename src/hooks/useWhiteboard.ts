@@ -275,7 +275,7 @@ export default function useWhiteboard() {
           const batch = boardBatch(queue.current);
           if (!batch.length)
             throw new Error(
-              'A pending drawing exceeds the service size limit.',
+              'A pending board edit exceeds the service size limit.',
             );
           const response = await api<{ operations: BoardOperation[] }>(
             `/api/meetings/${access.meetingId}/board`,
@@ -285,7 +285,7 @@ export default function useWhiteboard() {
             response.operations.map((operation) => operation.id),
           );
           if (!acknowledged.has(batch[0].id))
-            throw new Error('Drawing acknowledgement was invalid.');
+            throw new Error('Board acknowledgement was invalid.');
           response.operations.forEach(accept);
           queue.current = queue.current.filter(
             (operation) => !acknowledged.has(operation.id),
@@ -296,7 +296,7 @@ export default function useWhiteboard() {
         return queue.current.length === 0;
       } catch (failure) {
         if (mounted.current)
-          setError(`Drawing is not synced: ${errorMessage(failure)}`);
+          setError(`Board changes are not synced: ${errorMessage(failure)}`);
         return false;
       } finally {
         sending.current = undefined;
@@ -308,6 +308,27 @@ export default function useWhiteboard() {
   useEffect(() => {
     if (!loading && chatClient) void flush();
   }, [loading, chatClient, flush]);
+  useEffect(() => {
+    const retryPending = async () => {
+      // A reconnect may arrive while the failed request is still settling.
+      // Wait for it before creating the new attempt; flush deduplicates retries.
+      if (sending.current) await sending.current;
+      if (mounted.current) await flush();
+    };
+    const recover = () => {
+      void historyRetry.current?.();
+      void retryPending();
+    };
+    window.addEventListener('online', recover);
+    const recovered = chatClient?.on(
+      'connection.recovered',
+      () => void flush(),
+    );
+    return () => {
+      window.removeEventListener('online', recover);
+      recovered?.unsubscribe();
+    };
+  }, [chatClient, flush]);
   const preview = useCallback((operation: BoardOperation) => {
     if (!liveChannel.current) return;
     liveQueue.current.push(operation);

@@ -32,3 +32,5 @@ Atomic commits will separate model/protocol, interaction surfaces, collaboration
 - Connector label editing follow-up: connectors now render the shared text editor, accessible via double-click, F2 or contextual Edit content; visual exports include escaped labels. Typecheck and lint pass. Manual acceptance is step 51.
 
 - Diagram export fidelity: 54 automated tests, typecheck and lint pass. Live and exported connectors share cubic geometry; regression coverage includes escaped labels and hidden endpoints. Manual acceptance is step 52.
+
+- Recovery follow-up: browser online and chat recovery events retry pending durable edits, waiting for any in-flight attempt to settle before retrying. Board error wording covers objects and writing as well as ink. Typecheck and lint pass; network interruption acceptance is step 53 and remains manual.
