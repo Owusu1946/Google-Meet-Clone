@@ -1,5 +1,5 @@
 'use client';
-import { useEffect, useRef } from 'react';
+import { useEffect } from 'react';
 import { useParams } from 'next/navigation';
 import {
   CallingState,
@@ -62,13 +62,6 @@ function MeetingRoom() {
         `Some devices could not be enabled: ${room.mediaError}. Check permissions or change devices in Settings.`,
       );
   }, [room.mediaError, setError]);
-  const previous = useRef(room.participants.length);
-  const joinAudio = useRef<HTMLAudioElement>(null);
-  useEffect(() => {
-    if (room.participants.length > previous.current)
-      void joinAudio.current?.play().catch(() => undefined);
-    previous.current = room.participants.length;
-  }, [room.participants.length]);
   return (
     <StreamTheme className="root-theme">
       <div id="meeting-root" className="meeting-shell">
@@ -151,10 +144,6 @@ function MeetingRoom() {
         <ReactionOverlay
           reactions={reactions.reactions}
           onReactionComplete={reactions.removeReaction}
-        />
-        <audio
-          ref={joinAudio}
-          src="https://www.gstatic.com/meet/sounds/join_call_6a6a67d6bcc7a4e373ed40fdeff3930a.ogg"
         />
       </div>
     </StreamTheme>

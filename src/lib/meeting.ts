@@ -1,3 +1,4 @@
+import { unlockMeetingSounds } from './meeting-sounds';
 export const CALL_TYPE = 'meet';
 export const CHAT_TYPE = 'meet-chat';
 export const BOARD_TYPE = 'meet-board';
@@ -68,6 +69,8 @@ function guestTabId() {
 }
 
 export async function api<T>(url: string, init?: RequestInit): Promise<T> {
+  if (typeof navigator !== 'undefined' && navigator.userActivation?.isActive)
+    unlockMeetingSounds();
   const response = await fetch(url, {
     ...init,
     cache: 'no-store',
