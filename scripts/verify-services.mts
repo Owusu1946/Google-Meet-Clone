@@ -10,6 +10,7 @@ import {
   type Channel,
   type Event,
 } from 'stream-chat';
+import { textDocument, insertedAtomIds } from '../src/lib/workspace-text';
 import { newObject, workspaceObjects } from '../src/lib/workspace';
 import { boardBatch, canonicalBoardOperations } from '../src/lib/whiteboard';
 import { signGuest } from '../src/lib/server/guest-session';
@@ -435,6 +436,74 @@ try {
     'Shared task',
   );
   checks++;
+  const hostText = {
+    id: randomUUID(),
+    kind: 'text-insert',
+    objectId,
+    after: null,
+    text: '[Host]',
+    clock: 1,
+  };
+  const guestText = {
+    id: randomUUID(),
+    kind: 'text-insert',
+    objectId,
+    after: null,
+    text: '[Guest]',
+    clock: 1,
+  };
+  const [hostSaved, guestSaved] = await Promise.all([
+    request(`${path}/board`, host, hostText),
+    request(`${path}/board`, applicant, guestText),
+  ]);
+  const textHistory = [
+    createdObject.operation,
+    writtenObject.operation,
+    hostSaved.operation,
+    guestSaved.operation,
+  ];
+  const concurrentText = textDocument(objectId, textHistory).text;
+  assert.ok(
+    concurrentText.includes('[Host]') &&
+      concurrentText.includes('[Guest]') &&
+      concurrentText.endsWith('Shared task'),
+  );
+  assert.equal(
+    textDocument(objectId, [...textHistory].reverse()).text,
+    concurrentText,
+  );
+  checks++;
+  assert.deepEqual(
+    (await request(`${path}/board`, host, hostText)).operation,
+    hostSaved.operation,
+  );
+  checks++;
+  const undoText = await request(`${path}/board`, host, {
+    id: randomUUID(),
+    kind: 'text-visible',
+    objectId,
+    atomIds: insertedAtomIds(hostText.id, hostText.text),
+    visible: false,
+  });
+  assert.equal(
+    textDocument(objectId, [...textHistory, undoText.operation]).text,
+    '[Guest]Shared task',
+  );
+  checks++;
+  const textRecovery = await boardReceiver.query({ messages: { limit: 100 } });
+  const recoveredText = textDocument(
+    objectId,
+    textRecovery.messages.flatMap((message) =>
+      canonicalBoardOperations(
+        message.board_operations || message.board_operation,
+        message.user?.id || '',
+        message.created_at!,
+        message.id,
+      ),
+    ),
+  ).text;
+  assert.equal(recoveredText, '[Guest]Shared task');
+  checks++;
   await request(
     `${path}/board`,
     applicant,
@@ -536,6 +605,23 @@ try {
     `${path}/board`,
     applicant,
     { ...stroke, id: randomUUID() },
+    403,
+  );
+  await request(
+    `${path}/board`,
+    applicant,
+    { ...guestText, id: randomUUID() },
+    403,
+  );
+  await request(
+    `${path}/board`,
+    applicant,
+    {
+      id: randomUUID(),
+      kind: 'object-patch',
+      objectId,
+      fields: { x: 1 },
+    },
     403,
   );
   assert.equal(
