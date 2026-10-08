@@ -57,6 +57,19 @@ export function PresenterPipProvider({ children }: { children: ReactNode }) {
                     </div>
                   ))}
                 </div>
+                {room.local && (
+                  <div
+                    className="presenter-pip-screen"
+                    aria-label="Your presentation preview"
+                  >
+                    <ParticipantView
+                      participant={room.local}
+                      trackType="screenShareTrack"
+                      muteAudio
+                      ParticipantViewUI={() => null}
+                    />
+                  </div>
+                )}
                 <div className="presenter-pip-controls">
                   <button
                     aria-label={

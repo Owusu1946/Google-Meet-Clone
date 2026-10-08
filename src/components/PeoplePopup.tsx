@@ -7,6 +7,7 @@ import {
 import Avatar from './Avatar';
 import type { JoinRequest } from '@/lib/meeting';
 import { useState } from 'react';
+import PresentToAll from './icons/PresentToAll';
 export default function PeoplePopup({
   participants,
   hostId,
@@ -84,7 +85,10 @@ export default function PeoplePopup({
         <h3 className="people-section-label">In the meeting</h3>
         <details className="people-contributors" open>
           <summary>
-            Contributors <span>{participants.length}</span>
+            Contributors{' '}
+            <span>
+              {participants.length + participants.filter(hasScreenShare).length}
+            </span>
           </summary>
           <ul className="space-y-5">
             {ordered
@@ -132,6 +136,19 @@ export default function PeoplePopup({
                       >
                         Remove
                       </button>
+                    </div>
+                  )}
+                  {hasScreenShare(participant) && (
+                    <div className="people-presentation-row">
+                      <PresentToAll />
+                      <div>
+                        <p>{participant.name || participant.userId}</p>
+                        <small>
+                          {participant.userId === meId
+                            ? 'Your presentation'
+                            : 'Presentation'}
+                        </small>
+                      </div>
                     </div>
                   )}
                 </li>

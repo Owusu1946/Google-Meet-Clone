@@ -2019,3 +2019,42 @@ input:focus-visible {
     gap: 4px;
   }
 }
+.presenter-pip-screen {
+  flex: 0 1 160px;
+  min-height: 60px;
+  border-radius: 12px;
+  overflow: hidden;
+}
+.root-theme .presenter-pip-screen .str-video__participant-view {
+  width: 100%;
+  height: 100%;
+  max-width: none;
+  aspect-ratio: unset;
+  background: transparent;
+}
+.root-theme .presenter-pip-screen video {
+  object-fit: contain !important;
+}
+.people-presentation-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 16px 0 0 12px;
+  font-size: 14px;
+}
+.people-presentation-row svg {
+  fill: #a8c7fa;
+  flex-shrink: 0;
+}
+.people-presentation-row small {
+  color: #bdc1c6;
+  font-size: 12px;
+}
+@media (max-height: 400px) and (display-mode: picture-in-picture) {
+  .presenter-pip-screen {
+    display: none;
+  }
+  .presenter-pip-participants {
+    grid-auto-rows: minmax(80px, 1fr);
+  }
+}
