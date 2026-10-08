@@ -16,6 +16,7 @@ export default function PresentationLayout() {
         <ParticipantView
           participant={presenter}
           trackType="screenShareTrack"
+          muteAudio
           ParticipantViewUI={() => null}
         />
       </div>
