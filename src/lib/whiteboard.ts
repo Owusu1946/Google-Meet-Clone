@@ -1,3 +1,4 @@
+import { validTextMutation, type TextMutation } from './workspace-text';
 import {
   validWorkspaceMutation,
   compareOperations,
@@ -22,6 +23,7 @@ export type BoardOperation = {
       width: number;
     }
   | { kind: 'visibility'; strokeId: string; visible: boolean }
+  | TextMutation
   | WorkspaceMutation
   | { kind: 'clear' }
 );
@@ -53,6 +55,8 @@ export function validOperation(input: unknown): input is BoardOperation {
   )
     return false;
   if (operation.kind === 'clear') return true;
+  if (operation.kind === 'text-insert' || operation.kind === 'text-visible')
+    return validTextMutation(operation);
   if (
     operation.kind === 'object-create' ||
     operation.kind === 'object-patch' ||

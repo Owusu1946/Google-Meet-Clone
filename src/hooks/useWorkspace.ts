@@ -1,10 +1,17 @@
 'use client';
+import {
+  textEdit,
+  insertedAtomIds,
+  type TextMutation,
+} from '@/lib/workspace-text';
+import type { BoardOperation } from '@/lib/whiteboard';
 import { useCallback, useMemo, useRef, useState } from 'react';
 import { useRoom } from '@/contexts/MeetingRoomContext';
 import {
   workspaceObjects,
   newObject,
   objectFields,
+  textSeed,
   type ObjectFields,
   type ObjectType,
   type WorkspaceMutation,
@@ -17,7 +24,10 @@ import {
   type TemplateName,
 } from '@/lib/workspace-layout';
 
-type Change = { forward: WorkspaceMutation[]; backward: WorkspaceMutation[] };
+type Change = {
+  forward: (WorkspaceMutation | TextMutation | BoardOperation)[];
+  backward: (WorkspaceMutation | TextMutation)[];
+};
 export default function useWorkspace() {
   const room = useRoom();
   const objects = useMemo(
@@ -47,13 +57,28 @@ export default function useWorkspace() {
     [canEdit, room.board],
   );
   const createObjects = (items: WorkspaceObject[]) => {
+    const creates: BoardOperation[] = items.map((item) => ({
+      id: crypto.randomUUID(),
+      actor: room.access.identity.id,
+      time: new Date().toISOString(),
+      kind: 'object-create',
+      objectId: item.id,
+      objectType: item.type,
+      fields: { ...objectFields(item), text: textSeed(item.text) },
+    }));
+    const forward: BoardOperation[] = [...creates];
+    items.forEach((item, index) =>
+      forward.push(
+        ...textEdit(
+          item.id,
+          item.text,
+          [creates[index]],
+          room.access.identity.id,
+        ).forward,
+      ),
+    );
     commit({
-      forward: items.map((item) => ({
-        kind: 'object-create',
-        objectId: item.id,
-        objectType: item.type,
-        fields: objectFields(item),
-      })),
+      forward,
       backward: items.map((item) => ({
         kind: 'object-visible',
         objectId: item.id,
@@ -78,12 +103,28 @@ export default function useWorkspace() {
       type,
       visible: true,
     };
+    item.parentId = containingFrame(item, objects)?.id || item.parentId;
     createObjects([item]);
     return item.id;
   };
-  const patch = (id: string, fields: Partial<ObjectFields>) => {
+  const patch = (
+    id: string,
+    fields: Partial<ObjectFields>,
+    baseline?: BoardOperation[],
+  ) => {
     const object = objects.find((item) => item.id === id);
     if (!object) return;
+    if (typeof fields.text === 'string' && Object.keys(fields).length === 1) {
+      commit(
+        textEdit(
+          id,
+          fields.text,
+          baseline || room.board.operations,
+          room.access.identity.id,
+        ),
+      );
+      return;
+    }
     const before = Object.fromEntries(
       Object.keys(fields).map((key) => [
         key,
@@ -167,13 +208,23 @@ export default function useWorkspace() {
     if (!canEdit) return;
     const change = redoStack.current.pop();
     if (!change) return;
-    change.forward.forEach((op) =>
-      room.board.send(
-        op.kind === 'object-create'
-          ? { kind: 'object-visible', objectId: op.objectId, visible: true }
-          : op,
-      ),
-    );
+    change.forward.forEach((op) => {
+      if (op.kind === 'text-insert' && 'id' in op) {
+        const ids = insertedAtomIds(op.id, op.text);
+        for (let index = 0; index < ids.length; index += 12)
+          room.board.send({
+            kind: 'text-visible',
+            objectId: op.objectId,
+            atomIds: ids.slice(index, index + 12),
+            visible: true,
+          });
+      } else
+        room.board.send(
+          op.kind === 'object-create'
+            ? { kind: 'object-visible', objectId: op.objectId, visible: true }
+            : { ...op, id: crypto.randomUUID() },
+        );
+    });
     undoStack.current.push(change);
     setHistoryVersion((value) => value + 1);
   };

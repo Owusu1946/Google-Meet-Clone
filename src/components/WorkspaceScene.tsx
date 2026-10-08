@@ -9,7 +9,7 @@ import {
 } from '@/lib/workspace';
 import { peerColor } from '@/lib/workspace-presence';
 import { frameDescendants } from '@/lib/workspace-layout';
-import { type Point, viewToWorld } from '@/lib/whiteboard';
+import { type BoardOperation, type Point, viewToWorld } from '@/lib/whiteboard';
 
 type Workspace = ReturnType<typeof useWorkspace>;
 type Gesture = {
@@ -38,9 +38,9 @@ export default function WorkspaceScene({
   const textTimer = useRef<ReturnType<typeof setTimeout> | undefined>(
     undefined,
   );
-  const textPending = useRef<{ id: string; text: string } | undefined>(
-    undefined,
-  );
+  const textPending = useRef<
+    { id: string; text: string; operations: BoardOperation[] } | undefined
+  >(undefined);
   const [connectFrom, setConnectFrom] = useState('');
   const [resize, setResize] = useState<{
     id: string;
@@ -113,9 +113,15 @@ export default function WorkspaceScene({
   const flushText = () => {
     clearTimeout(textTimer.current);
     const pending = textPending.current;
-    if (pending) model.patch(pending.id, { text: pending.text });
+    if (pending)
+      model.patch(pending.id, { text: pending.text }, pending.operations);
     textPending.current = undefined;
   };
+  const sharedText = objects.find((item) => item.id === editing)?.text;
+  useEffect(() => {
+    if (editing && sharedText !== undefined && !textPending.current)
+      setText(sharedText);
+  }, [editing, sharedText]);
   const flushRef = useRef(flushText);
   flushRef.current = flushText;
   useEffect(() => () => flushRef.current(), []);
@@ -126,6 +132,16 @@ export default function WorkspaceScene({
   ) => {
     if (event.button !== 0 || editing === item.id) return;
     event.stopPropagation();
+    if (
+      OBJECT_TYPES.includes(tool as ObjectType) &&
+      tool !== 'connector' &&
+      model.canEdit
+    ) {
+      const point = world(event);
+      model.create(tool as ObjectType, point.x, point.y);
+      onTool('select');
+      return;
+    }
     if (tool === 'connect') {
       if (!model.canEdit || item.type === 'connector') return;
       if (connectFrom && connectFrom !== item.id) {
@@ -308,77 +324,77 @@ export default function WorkspaceScene({
         }
       }}
     >
-      <svg className="workspace-connections" aria-label="Connections">
-        <defs>
-          <marker
-            id="workspace-arrow"
-            markerWidth="10"
-            markerHeight="10"
-            refX="9"
-            refY="3"
-            orient="auto"
-            markerUnits="strokeWidth"
-          >
-            <path d="M0,0 L0,6 L9,3 z" fill="#64748b" />
-          </marker>
-        </defs>
-        <g
-          transform={`translate(${transform.offset.x} ${transform.offset.y}) scale(${transform.scale})`}
-        >
-          {objects
-            .filter((item) => item.type === 'connector')
-            .map((item) => {
-              const ends = connectorEnds(item, objects);
-              if (!ends) return null;
-              const midX = (ends.from.x + ends.to.x) / 2;
-              const path = `M${ends.from.x},${ends.from.y} C${midX},${ends.from.y} ${midX},${ends.to.y} ${ends.to.x},${ends.to.y}`;
-              return (
-                <g
-                  key={item.id}
-                  onPointerDown={(event) => start(event, item)}
-                  className={
-                    model.selected.includes(item.id) ? 'is-selected' : ''
-                  }
-                >
-                  <path
-                    d={path}
-                    fill="none"
-                    stroke="transparent"
-                    strokeWidth="18"
-                    pointerEvents={tool === 'select' ? 'stroke' : 'none'}
-                  />
-                  <path
-                    d={path}
-                    fill="none"
-                    stroke={
-                      model.selected.includes(item.id) ? '#2563eb' : item.color
-                    }
-                    strokeWidth="2"
-                    markerEnd="url(#workspace-arrow)"
-                    pointerEvents="none"
-                  />
-                  {item.text && (
-                    <text
-                      x={midX}
-                      y={(ends.from.y + ends.to.y) / 2 - 10}
-                      textAnchor="middle"
-                      fontSize="13"
-                      fill="#475569"
-                    >
-                      {item.text}
-                    </text>
-                  )}
-                </g>
-              );
-            })}
-        </g>
-      </svg>
       <div
         className="workspace-world"
         style={{
           transform: `translate(${transform.offset.x}px, ${transform.offset.y}px) scale(${transform.scale})`,
         }}
       >
+        <svg className="workspace-connections" aria-label="Connections">
+          <defs>
+            <marker
+              id="workspace-arrow"
+              markerWidth="10"
+              markerHeight="10"
+              refX="9"
+              refY="3"
+              orient="auto"
+              markerUnits="strokeWidth"
+            >
+              <path d="M0,0 L0,6 L9,3 z" fill="#64748b" />
+            </marker>
+          </defs>
+          <g>
+            {objects
+              .filter((item) => item.type === 'connector')
+              .map((item) => {
+                const ends = connectorEnds(item, objects);
+                if (!ends) return null;
+                const midX = (ends.from.x + ends.to.x) / 2;
+                const path = `M${ends.from.x},${ends.from.y} C${midX},${ends.from.y} ${midX},${ends.to.y} ${ends.to.x},${ends.to.y}`;
+                return (
+                  <g
+                    key={item.id}
+                    onPointerDown={(event) => start(event, item)}
+                    className={
+                      model.selected.includes(item.id) ? 'is-selected' : ''
+                    }
+                  >
+                    <path
+                      d={path}
+                      fill="none"
+                      stroke="transparent"
+                      strokeWidth="18"
+                      pointerEvents={tool === 'select' ? 'stroke' : 'none'}
+                    />
+                    <path
+                      d={path}
+                      fill="none"
+                      stroke={
+                        model.selected.includes(item.id)
+                          ? '#2563eb'
+                          : item.color
+                      }
+                      strokeWidth="2"
+                      markerEnd="url(#workspace-arrow)"
+                      pointerEvents="none"
+                    />
+                    {item.text && (
+                      <text
+                        x={midX}
+                        y={(ends.from.y + ends.to.y) / 2 - 10}
+                        textAnchor="middle"
+                        fontSize="13"
+                        fill="#475569"
+                      >
+                        {item.text}
+                      </text>
+                    )}
+                  </g>
+                );
+              })}
+          </g>
+        </svg>
         {[...objects]
           .sort(
             (a, b) =>
@@ -402,7 +418,10 @@ export default function WorkspaceScene({
                   top: item.y,
                   width: dimensions.width,
                   height: dimensions.height,
-                  backgroundColor: item.color,
+                  backgroundColor:
+                    item.type === 'diamond' ? 'transparent' : item.color,
+                  zIndex:
+                    item.type === 'frame' || item.type === 'column' ? 0 : 2,
                   fontSize: item.fontSize,
                   pointerEvents: interactive ? 'auto' : 'none',
                 }}
@@ -410,6 +429,20 @@ export default function WorkspaceScene({
                 onFocus={() => {
                   if (!model.selected.includes(item.id))
                     model.setSelected([item.id]);
+                }}
+                onKeyDown={(event) => {
+                  if (
+                    (event.key === 'Enter' || event.key === 'F2') &&
+                    model.canEdit &&
+                    tool === 'select' &&
+                    event.target === event.currentTarget
+                  ) {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    flushText();
+                    setEditing(item.id);
+                    setText(item.text);
+                  }
                 }}
                 onDoubleClick={(event) => {
                   if (!model.canEdit || tool !== 'select') return;
@@ -419,10 +452,24 @@ export default function WorkspaceScene({
                   setText(item.text);
                 }}
               >
+                {item.type === 'diamond' && (
+                  <svg
+                    className="workspace-diamond"
+                    viewBox="0 0 100 100"
+                    preserveAspectRatio="none"
+                    aria-hidden="true"
+                  >
+                    <polygon
+                      points="50,1 99,50 50,99 1,50"
+                      fill={item.color}
+                      stroke="#94a3b8"
+                    />
+                  </svg>
+                )}
                 {editing === item.id ? (
                   <textarea
                     autoFocus
-                    maxLength={1600}
+                    maxLength={32000}
                     aria-label={`Edit ${item.type}`}
                     value={text}
                     onPointerDown={(event) => event.stopPropagation()}
@@ -432,9 +479,15 @@ export default function WorkspaceScene({
                     }}
                     onChange={(event) => {
                       const value = event.target.value;
-                      if (new TextEncoder().encode(value).length > 2400) return;
+                      if (value.length > 32000) return;
                       setText(value);
-                      textPending.current = { id: item.id, text: value };
+                      textPending.current = {
+                        id: item.id,
+                        text: value,
+                        operations:
+                          textPending.current?.operations ||
+                          model.room.board.operations,
+                      };
                       clearTimeout(textTimer.current);
                       textTimer.current = setTimeout(flushText, 200);
                     }}

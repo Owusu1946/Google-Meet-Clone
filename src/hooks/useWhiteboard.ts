@@ -363,7 +363,10 @@ export default function useWhiteboard() {
     ) => {
       const operation = {
         ...input,
-        id: crypto.randomUUID(),
+        id:
+          'id' in input && typeof input.id === 'string'
+            ? input.id
+            : crypto.randomUUID(),
         actor: access.identity.id,
         time: new Date().toISOString(),
       };
@@ -393,7 +396,10 @@ export default function useWhiteboard() {
     previewChange: (input: Record<string, unknown>) => {
       const operation = {
         ...input,
-        id: crypto.randomUUID(),
+        id:
+          'id' in input && typeof input.id === 'string'
+            ? input.id
+            : crypto.randomUUID(),
         actor: access.identity.id,
         time: new Date().toISOString(),
       };

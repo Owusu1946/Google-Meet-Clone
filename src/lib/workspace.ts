@@ -1,3 +1,4 @@
+import { textDocument } from './workspace-text';
 import type { BoardOperation } from './whiteboard';
 
 export const OBJECT_TYPES = [
@@ -137,7 +138,25 @@ export function workspaceObjects(
     if (op.kind === 'object-visible') object.visible = op.visible;
     else Object.assign(object, op.fields);
   }
-  return [...objects.values()];
+  const documents = new Map<string, BoardOperation[]>();
+  for (const operation of current) {
+    if (
+      'objectId' in operation &&
+      (operation.kind === 'object-create' ||
+        operation.kind === 'text-insert' ||
+        operation.kind === 'text-visible' ||
+        (operation.kind === 'object-patch' &&
+          typeof operation.fields.text === 'string'))
+    ) {
+      const history = documents.get(operation.objectId) || [];
+      history.push(operation);
+      documents.set(operation.objectId, history);
+    }
+  }
+  return [...objects.values()].map((object) => ({
+    ...object,
+    text: textDocument(object.id, documents.get(object.id) || []).text,
+  }));
 }
 export function objectFields(object: WorkspaceObject): ObjectFields {
   const { x, y, width, height, text, color, fontSize, parentId, from, to } =
@@ -198,4 +217,8 @@ export function connectorEnds(
     from: { x: from.x + from.width / 2, y: from.y + from.height / 2 },
     to: { x: to.x + to.width / 2, y: to.y + to.height / 2 },
   };
+}
+
+export function textSeed(text: string) {
+  return [...text].slice(0, 400).join('');
 }

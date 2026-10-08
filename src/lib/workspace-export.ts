@@ -1,6 +1,7 @@
 import {
   connectorEnds,
   objectFields,
+  textSeed,
   validFields,
   OBJECT_TYPES,
   type WorkspaceObject,
@@ -124,13 +125,14 @@ export function workspaceSnapshot(
   strokes: BoardStroke[],
 ) {
   return JSON.stringify({
-    version: 1,
+    version: 2,
     objects: objects
       .filter((item) => item.visible)
       .map((item) => ({
         id: item.id,
         type: item.type,
-        fields: objectFields(item),
+        fields: { ...objectFields(item), text: textSeed(item.text) },
+        content: item.text,
       })),
     strokes: strokes
       .filter((item) => item.visible)
@@ -154,7 +156,7 @@ export function parseWorkspaceSnapshot(
   const value = JSON.parse(input);
   if (
     !value ||
-    value.version !== 1 ||
+    ![1, 2].includes(value.version) ||
     !Array.isArray(value.objects) ||
     !Array.isArray(value.strokes) ||
     value.objects.length > 500 ||
@@ -168,7 +170,9 @@ export function parseWorkspaceSnapshot(
       typeof item.id !== 'string' ||
       ids.has(item.id) ||
       !OBJECT_TYPES.includes(item.type) ||
-      !validFields(item.fields, true)
+      !validFields(item.fields, true) ||
+      (item.content !== undefined &&
+        (typeof item.content !== 'string' || item.content.length > 100000))
     )
       throw new Error('Invalid workspace object.');
     ids.set(item.id, `${actor}:${crypto.randomUUID()}`);
@@ -200,8 +204,14 @@ export function parseWorkspaceSnapshot(
     throw new Error('Workspace contains too many drawing points.');
   return {
     objects: value.objects.map(
-      (item: { id: string; type: ObjectType; fields: ObjectFields }) => ({
+      (item: {
+        id: string;
+        type: ObjectType;
+        fields: ObjectFields;
+        content?: string;
+      }) => ({
         ...item.fields,
+        text: item.content ?? item.fields.text,
         id: ids.get(item.id)!,
         actor,
         type: item.type,

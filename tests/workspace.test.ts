@@ -238,3 +238,95 @@ test('SVG exports escape text and use bounded dimensions while file imports reje
     /under 2 MB/,
   );
 });
+import {
+  textEdit,
+  textDocument,
+  insertedAtomIds,
+} from '../src/lib/workspace-text';
+test('simultaneous text inserts merge without replacing either writer and survive reordering', () => {
+  const initial = {
+    ...create,
+    fields: { ...newObject('text', 0, 0), text: 'AB' },
+  } as BoardOperation;
+  const alice = textEdit(objectId, 'AhelloB', [initial], actor);
+  const bob = textEdit(objectId, 'AworldB', [initial], 'guest_bob');
+  const result = textDocument(objectId, [
+    initial,
+    ...alice.forward,
+    ...bob.forward,
+  ]).text;
+  assert.ok(result.includes('hello'));
+  assert.ok(result.includes('world'));
+  assert.equal(
+    textDocument(objectId, [...bob.forward, ...alice.forward, initial]).text,
+    result,
+  );
+  const undone = alice.backward.map((op, index) => operation(op, index + 100));
+  assert.equal(
+    textDocument(objectId, [
+      initial,
+      ...alice.forward,
+      ...bob.forward,
+      ...undone,
+    ]).text,
+    'AworldB',
+  );
+  const restored = alice.forward
+    .filter((op) => op.kind === 'text-insert')
+    .flatMap((op) =>
+      op.kind === 'text-insert'
+        ? [
+            operation(
+              {
+                kind: 'text-visible',
+                objectId,
+                atomIds: insertedAtomIds(op.id, op.text),
+                visible: true,
+              },
+              200,
+            ),
+          ]
+        : [],
+    );
+  assert.equal(
+    textDocument(objectId, [
+      initial,
+      ...alice.forward,
+      ...bob.forward,
+      ...undone,
+      ...restored,
+    ]).text,
+    result,
+  );
+});
+test('text deletion preserves concurrent descendants, emoji and long insert chunks', () => {
+  const initial = {
+    ...create,
+    fields: { ...newObject('text', 0, 0), text: 'A🙂B' },
+  } as BoardOperation;
+  const deletion = textEdit(objectId, 'AB', [initial], actor);
+  const addition = textEdit(objectId, 'A🙂newB', [initial], 'guest_bob');
+  assert.equal(
+    textDocument(objectId, [initial, ...deletion.forward, ...addition.forward])
+      .text,
+    'AnewB',
+  );
+  const long = textEdit(objectId, '🙂'.repeat(1000), [initial], actor);
+  assert.ok(long.forward.every(validOperation));
+  assert.equal(
+    textDocument(objectId, [initial, ...long.forward]).text,
+    '🙂'.repeat(1000),
+  );
+  assert.equal(
+    validOperation(
+      operation({
+        kind: 'text-insert',
+        objectId,
+        text: 'x',
+        clock: Infinity,
+        after: null,
+      }),
+    ),
+    false,
+  );
+});

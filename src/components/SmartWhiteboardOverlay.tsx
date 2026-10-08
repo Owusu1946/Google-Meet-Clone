@@ -657,7 +657,59 @@ export default function SmartWhiteboardOverlay({
               ))}
             </select>
           </label>
-          <span>Double-click to edit · Shift-click to select more</span>
+          {workspace.selected.length === 1 && (
+            <label>
+              Content{' '}
+              <input
+                aria-label="Selected object content"
+                disabled={!canDraw}
+                value={
+                  workspace.objects.find(
+                    (item) => item.id === workspace.selected[0],
+                  )?.text || ''
+                }
+                maxLength={32000}
+                onChange={(event) =>
+                  workspace.patch(workspace.selected[0], {
+                    text: event.target.value,
+                  })
+                }
+              />
+            </label>
+          )}
+          {workspace.selected.length === 1 &&
+            workspace.objects.find((item) => item.id === workspace.selected[0])
+              ?.type === 'column' && (
+              <button
+                className="board-tool"
+                disabled={!canDraw}
+                onClick={() => {
+                  const column = workspace.objects.find(
+                    (item) => item.id === workspace.selected[0],
+                  )!;
+                  const cards = workspace.objects.filter(
+                    (item) => item.visible && item.parentId === column.id,
+                  );
+                  const y = Math.max(
+                    column.y + 70,
+                    ...cards.map((item) => item.y + item.height + 16),
+                  );
+                  workspace.create('card', column.x + 20, y, {
+                    width: column.width - 40,
+                    parentId: column.id,
+                  });
+                  if (y + 190 > column.y + column.height)
+                    workspace.patch(column.id, {
+                      height: Math.min(10000, y + 190 - column.y),
+                    });
+                }}
+              >
+                Add card
+              </button>
+            )}
+          <span>
+            Double-click or Enter to edit · Shift-click to select more
+          </span>
         </div>
       )}
       <div className="flex-1 min-h-0 relative workspace-viewport">
@@ -671,7 +723,7 @@ export default function SmartWhiteboardOverlay({
             )
               ? 'auto'
               : 'none',
-            zIndex: ['pen', 'highlighter', 'eraser'].includes(tool) ? 3 : 0,
+            zIndex: 3,
           }}
           onPointerDown={down}
           onPointerMove={move}
@@ -712,7 +764,10 @@ export default function SmartWhiteboardOverlay({
         onClose={() => setClearPrompt(false)}
         title="Clear the shared board?"
       >
-        <p>This removes everyone’s drawings from the board.</p>
+        <p>
+          This removes all drawings, objects, frames, and connections for
+          everyone.
+        </p>
         <button
           className="primary-button mt-5"
           onClick={() => {
