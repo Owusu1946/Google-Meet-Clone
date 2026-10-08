@@ -10,9 +10,24 @@ export default function usePreviewBlur(
   const [error, setError] = useState('');
   useEffect(() => {
     let cancelled = false;
+    let failed = false;
     let processor:
       import('@stream-io/video-filters-web').VirtualBackground | undefined;
     let source: MediaStreamTrack | undefined;
+    let output: MediaStreamTrack | undefined;
+    const stop = () => {
+      output?.stop();
+      processor?.stop();
+      source?.stop();
+    };
+    const fail = (failure: unknown) => {
+      if (cancelled || failed) return;
+      failed = true;
+      setProcessed(undefined);
+      setError(`Background blur stopped: ${errorMessage(failure)}`);
+      setBusy(false);
+      stop();
+    };
     setProcessed(undefined);
     setError('');
     setBusy(false);
@@ -30,32 +45,24 @@ export default function usePreviewBlur(
         source,
         { backgroundFilter: 'blur', backgroundBlurLevel: level },
         {
-          onError: (failure) => {
-            if (!cancelled) setError(errorMessage(failure));
-          },
+          onError: fail,
         },
       );
-      const output = await processor.start();
-      if (cancelled) {
-        output.stop();
-        processor.stop();
+      output = await processor.start();
+      if (cancelled || failed) {
+        stop();
         return;
       }
       setProcessed(new MediaStream([output]));
     };
     void start()
-      .catch((failure) => {
-        if (!cancelled) setError(errorMessage(failure));
-        processor?.stop();
-        source?.stop();
-      })
+      .catch(fail)
       .finally(() => {
         if (!cancelled) setBusy(false);
       });
     return () => {
       cancelled = true;
-      processor?.stop();
-      source?.stop();
+      stop();
     };
   }, [stream, level]);
   return { stream: processed || stream, busy, error };
