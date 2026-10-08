@@ -2,6 +2,15 @@
 
 Use a signed-in host plus a second signed-in account and a named guest in separate browser profiles/devices. Repeat the core media checks in Chrome/Edge, Firefox, Safari, and a narrow phone where available. No browser checks were performed by the implementation agent.
 
+## Meet-style lobby and overlay acceptance
+
+- On a fresh browser profile, the prejoin screen shows the permission explanation and disabled device selectors. Clicking a microphone/camera control opens the corresponding explanation, with the supplied illustration. Closing it requests nothing. Affirming requests only the selected device; the combined option requests both. Reject either independently and verify the other remains usable. Recover through browser permissions and retry. A saved enabled preference must not trigger a revoked permission prompt on reload.
+- With devices allowed, check the live mirrored preview, input selection, speaker selection carried into the call, unplug/reconnect, and camera/mic off states. Select slight/strong blur in the effects dialog: the person stays sharp, the background blurs, and remote viewers see the selected effect after joining. No image backgrounds or filters are offered. Check unavailable WebGL/model downloads, visible failure messages, and camera release after leaving. Switching effects repeatedly must not leak camera tracks or processors.
+- Ask to join a restricted meeting. The dark waiting room retains the self preview and microphone/camera/effects controls. It must not receive call media before admission. Cancel removes the applicant from the host queue; asking again restores it. A nonhost cannot cancel another applicant by submitting their ID. Test cancellation while admission/polling is in flight and failed cancellation followed by retry.
+- Host admission badge reflects the live queue. Admit/Deny acts on the named person; View all opens People. Escape restores trigger focus and clicking outside closes the popover. Nonhosts never see the queue. The first-join welcome card shows the actual link, signed-in identity, and current open/restricted/locked policy. Copy, Add others, dismissal, and reload work; a dismissed card stays hidden in the same tab.
+- Solo calls show a centered large tile; two-person auto layout shows the remote participant with a corner self preview. Adding a third participant returns to tiles; screen sharing, explicit layout changes, and pin/unpin retain spotlight behavior. Check names, mute state, captions, and side panels across transitions.
+- Check 320px phone, tablet, wide desktop, browser zoom, and short landscape windows. Waiting controls and in-call controls remain centered and reachable; popovers/dialogs scroll without hiding their close controls, and self previews do not block controls. Verify keyboard focus, Escape, screen-reader labels, and live status/error messages. Visual matching and real media behavior remain manual checks.
+
 ## Entry and admission
 
 1. Sign in; create an instant meeting, then create a meeting for later. Copy links and verify both survive reload.
