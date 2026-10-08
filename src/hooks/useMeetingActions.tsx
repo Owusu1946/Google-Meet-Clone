@@ -10,7 +10,10 @@ import Settings from '@/components/icons/Settings';
 import Info from '@/components/icons/Info';
 import Apps from '@/components/icons/Apps';
 import PersonAdd from '@/components/icons/PersonAdd';
-import Videocam from '@/components/icons/Videocam';
+import {
+  RecordingsIcon,
+  PresentBoardIcon,
+} from '@/components/icons/MeetingActions';
 import Keep from '@/components/icons/Keep';
 
 export type MeetingAction = {
@@ -116,7 +119,7 @@ export default function useMeetingActions(): MeetingAction[] {
       {
         id: 'recordings',
         title: 'Recordings',
-        icon: <Videocam />,
+        icon: <RecordingsIcon />,
         active: panel === 'recordings',
         onClick: () => togglePanel('recordings'),
       },
@@ -140,7 +143,7 @@ export default function useMeetingActions(): MeetingAction[] {
         title: room.custom.boardPresenting
           ? 'Stop presenting whiteboard'
           : 'Present whiteboard to everyone',
-        icon: <PresentToAll />,
+        icon: <PresentBoardIcon />,
         active: room.custom.boardPresenting === true,
         disabled: busy,
         onClick: () =>
