@@ -47,6 +47,8 @@ Keyboard shortcuts: Ctrl/Command+D toggles the microphone; Ctrl/Command+E toggle
 
 ## Validation
 
+The top-right People pill previews joined participants on hover/focus and opens the searchable participant panel on click. Shared screens use a presentation stage with a camera strip and a presenter status/stop button. Presenters on browsers supporting Document Picture-in-Picture can click the banner's PiP button to move live participant tiles, a silent share preview, and call controls into a floating window. Closing the window, stopping sharing, or leaving restores/cleans up the window. Opening requires a user action; unsupported browsers keep the normal presentation layout.
+
 ```sh
 pnpm format:check
 pnpm lint

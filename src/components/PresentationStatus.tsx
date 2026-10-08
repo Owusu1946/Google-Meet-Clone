@@ -6,7 +6,9 @@ import { usePresenterWindow } from '@/contexts/PresenterPipContext';
 export default function PresentationStatus() {
   const room = useRoom();
   const pip = usePresenterWindow();
-  const presenter = room.participants.find(hasScreenShare);
+  const presenter =
+    (room.local && hasScreenShare(room.local) ? room.local : undefined) ||
+    room.participants.find(hasScreenShare);
   if (!presenter) return null;
   return (
     <div className="presentation-status" role="status">
