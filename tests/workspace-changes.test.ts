@@ -1,3 +1,9 @@
+import { textEdit } from '../src/lib/workspace-text';
+import {
+  captureWorkspace,
+  workspaceSnapshot,
+} from '../src/lib/workspace-export';
+import { createDraftBarrier } from '../src/lib/draft-barrier';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
@@ -226,4 +232,47 @@ test('consecutive undo transfers ownership per property without claiming peer wr
     ).forward,
     [second],
   );
+});
+
+test('export drains active writing drafts and reads current operations before React renders', () => {
+  const actor = 'guest_export';
+  const items = workspaceTemplate('Writing outline', actor, 0, 0);
+  let operations = prepareBoardOperations(
+    workspaceCreation(items, actor).forward,
+    actor,
+  )!;
+  const barrier = createDraftBarrier();
+  const target = items.find((item) => item.type !== 'frame')!;
+  barrier.register(() => {
+    operations = [
+      ...operations,
+      ...textEdit(target.id, 'Final unsaved keystrokes 😀', operations, actor)
+        .forward,
+    ];
+  });
+  const captured = captureWorkspace({
+    flushDrafts: barrier.flush,
+    getOperations: () => operations,
+  });
+  assert.equal(
+    captured.objects.find((item) => item.id === target.id)!.text,
+    'Final unsaved keystrokes 😀',
+  );
+  assert.match(
+    workspaceSnapshot(captured.objects, captured.strokes),
+    /Final unsaved keystrokes 😀/,
+  );
+  let read = false;
+  assert.throws(
+    () =>
+      captureWorkspace({
+        flushDrafts: () => false,
+        getOperations: () => {
+          read = true;
+          return operations;
+        },
+      }),
+    /could not be saved/,
+  );
+  assert.equal(read, false);
 });

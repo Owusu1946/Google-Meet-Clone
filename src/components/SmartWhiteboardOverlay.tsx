@@ -23,6 +23,7 @@ import Close from './icons/Close';
 import useWorkspace from '@/hooks/useWorkspace';
 import WorkspaceScene from './WorkspaceScene';
 import {
+  captureWorkspace,
   workspaceBounds,
   workspaceSvg,
   workspaceSnapshot,
@@ -314,16 +315,17 @@ export default function SmartWhiteboardOverlay({
   const exportBoard = async (format: string) => {
     setFileError('');
     try {
+      const snapshot = captureWorkspace(workspace.room.board);
       if (format === 'json') {
         download(
-          new Blob([workspaceSnapshot(workspace.objects, strokes)], {
+          new Blob([workspaceSnapshot(snapshot.objects, snapshot.strokes)], {
             type: 'application/json',
           }),
           'json',
         );
         return;
       }
-      const svg = new Blob([workspaceSvg(workspace.objects, strokes)], {
+      const svg = new Blob([workspaceSvg(snapshot.layout, snapshot.strokes)], {
         type: 'image/svg+xml',
       });
       if (format === 'svg') {

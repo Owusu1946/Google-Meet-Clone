@@ -408,6 +408,7 @@ export default function useWhiteboard() {
         .concat([...stored.current.values()]),
     operations,
     registerDraft: draftBarrier.register,
+    flushDrafts: draftBarrier.flush,
     peers,
     announce,
     previewChange: (input: Record<string, unknown>) => {

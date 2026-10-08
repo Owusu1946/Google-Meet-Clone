@@ -1,4 +1,5 @@
 import {
+  workspaceObjects,
   connectorEnds,
   objectFields,
   textSeed,
@@ -8,7 +9,30 @@ import {
   type ObjectType,
   type ObjectFields,
 } from './workspace';
-import type { BoardStroke } from './whiteboard';
+import {
+  boardStrokes,
+  type BoardOperation,
+  type BoardStroke,
+} from './whiteboard';
+import { kanbanLayout } from './workspace-layout';
+
+export function captureWorkspace(source: {
+  flushDrafts: () => boolean;
+  getOperations: () => BoardOperation[];
+}) {
+  if (!source.flushDrafts())
+    throw new Error(
+      'Your latest changes could not be saved. Try exporting again.',
+    );
+  const operations = source.getOperations();
+  const objects = workspaceObjects(operations);
+  return {
+    objects,
+    layout: kanbanLayout(objects),
+    strokes: boardStrokes(operations),
+  };
+}
+
 const escape = (value: string) =>
   value.replace(
     /[&<>"']/g,
