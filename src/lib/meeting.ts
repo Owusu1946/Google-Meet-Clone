@@ -47,6 +47,26 @@ export type MeetingAccess = {
 };
 export type JoinRequest = { id: string; name: string; requestedAt: string };
 
+let guestTab: string | undefined;
+function guestTabId() {
+  if (typeof window === 'undefined') return undefined;
+  if (guestTab) return guestTab;
+  // New tabs (including duplicated tabs) must not inherit an admitted identity.
+  // A reload keeps this tab's identity so an admitted guest can reconnect.
+  const reload = performance
+    .getEntriesByType('navigation')
+    .some((entry) => (entry as PerformanceNavigationTiming).type === 'reload');
+  try {
+    guestTab =
+      (reload && sessionStorage.getItem('meet-guest-tab')) ||
+      crypto.randomUUID();
+    sessionStorage.setItem('meet-guest-tab', guestTab);
+  } catch {
+    guestTab = crypto.randomUUID();
+  }
+  return guestTab;
+}
+
 export async function api<T>(url: string, init?: RequestInit): Promise<T> {
   const response = await fetch(url, {
     ...init,
@@ -54,7 +74,11 @@ export async function api<T>(url: string, init?: RequestInit): Promise<T> {
     signal: init?.signal
       ? AbortSignal.any([init.signal, AbortSignal.timeout(30_000)])
       : AbortSignal.timeout(30_000),
-    headers: { 'Content-Type': 'application/json', ...init?.headers },
+    headers: {
+      'Content-Type': 'application/json',
+      ...(guestTabId() ? { 'X-Meet-Guest-Tab': guestTabId()! } : {}),
+      ...init?.headers,
+    },
   });
   const data = await response.json().catch(() => ({}));
   if (!response.ok)
