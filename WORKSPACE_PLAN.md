@@ -15,4 +15,4 @@ Atomic commits will separate model/protocol, interaction surfaces, collaboration
 
 ## Verification evidence
 
-31 automated tests, typecheck and lint pass. Live verification passed 73 API/service checks, including object persistence, retries, permissions, presence, and shared presentation settings. A production build passed before the final interaction refinements; those refinements have typecheck/lint coverage. Manual visual, touch, multi-device text editing and latency checks remain outstanding in MANUAL_TESTS.md. No browser was opened.
+33 automated tests, typecheck and lint pass. Live verification passed 73 API/service checks, including object persistence, retries, permissions, presence, and shared presentation settings. The production build passed after the interaction refinements and marquee/frame keyboard changes. Manual visual, touch, multi-device text editing and latency checks remain outstanding in MANUAL_TESTS.md. No browser was opened.
