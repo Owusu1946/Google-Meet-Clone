@@ -49,26 +49,29 @@ export function workspaceBounds(
   objects: WorkspaceObject[],
   strokes: BoardStroke[],
 ) {
-  const points = objects
-    .filter((item) => item.visible && item.type !== 'connector')
-    .flatMap((item) => [
-      { x: item.x, y: item.y },
-      { x: item.x + item.width, y: item.y + item.height },
-    ])
-    .concat(
-      strokes.filter((item) => item.visible).flatMap((item) => item.points),
-    );
-  if (!points.length) return { x: 0, y: 0, width: 900, height: 600 };
   let minX = Infinity,
     minY = Infinity,
     maxX = -Infinity,
     maxY = -Infinity;
-  for (const point of points) {
-    minX = Math.min(minX, point.x);
-    minY = Math.min(minY, point.y);
-    maxX = Math.max(maxX, point.x);
-    maxY = Math.max(maxY, point.y);
+  const include = (x: number, y: number, radius = 0) => {
+    minX = Math.min(minX, x - radius);
+    minY = Math.min(minY, y - radius);
+    maxX = Math.max(maxX, x + radius);
+    maxY = Math.max(maxY, y + radius);
+  };
+  for (const item of objects) {
+    if (!item.visible || item.type === 'connector') continue;
+    include(item.x, item.y);
+    include(item.x + item.width, item.y + item.height);
   }
+  // Erasers remove ink; they must not enlarge the exported page or Fit view.
+  // Scan points directly rather than allocating a second large point array.
+  for (const stroke of strokes) {
+    if (!stroke.visible || stroke.mode === 'eraser') continue;
+    for (const point of stroke.points)
+      include(point.x, point.y, stroke.width / 2);
+  }
+  if (minX === Infinity) return { x: 0, y: 0, width: 900, height: 600 };
   return {
     x: minX - 40,
     y: minY - 40,

@@ -105,3 +105,5 @@ Record browser/device, scenario number, expected/actual result, and console/serv
 46. Move the same object three times, then Undo three times and Redo three times. Repeat with a second collaborator changing one property between moves: consecutive history must preserve that person's property while reversing your other properties.
 
 47. While editing a note or code block, type a final sentence and immediately export JSON, SVG and PNG. Each file must contain the latest text. Re-import JSON from a reordered Kanban board and verify its ordering and connections remain editable. If editing permission is revoked with a pending draft, export must report the unsaved draft instead of downloading stale content.
+
+48. Draw a thick stroke, pan far away and erase an empty area, then choose Fit and export SVG/PNG. Fit and the exported page must remain framed around the content, including the stroke edges. An eraser-only board should retain the empty-board framing.

@@ -22,3 +22,5 @@ Atomic commits will separate model/protocol, interaction surfaces, collaboration
 - Export capture follow-up: 49 tests, typecheck and lint pass. Export drains editor drafts and reads current operations synchronously; JSON retains raw editable ordering while visual exports derive Kanban layout. Manual export acceptance is listed in step 47.
 
 - Isolated production build passed after selective/consecutive object history and synchronous export capture changes.
+
+- Fit/export bounds follow-up: 50 automated tests pass; typecheck and lint pass. Eraser-only extents no longer enlarge framing, visible ink width is included, and bounds scan points without allocating a duplicate array. Manual acceptance is step 48.

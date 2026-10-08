@@ -473,3 +473,42 @@ test('adding a card appends after reordered ranks rather than using displayed co
     column.y + 70,
   );
 });
+
+test('Fit and export bounds include ink width but ignore remote eraser-only extents', () => {
+  const stroke = {
+    id: 'ink',
+    actor: 'alice',
+    visible: true,
+    mode: 'pen' as const,
+    color: '#000000',
+    width: 40,
+    points: [
+      { x: 0, y: 0 },
+      { x: 100, y: 100 },
+    ],
+  };
+  const eraser = {
+    ...stroke,
+    id: 'eraser',
+    mode: 'eraser' as const,
+    points: [{ x: 100000, y: -100000 }],
+  };
+  assert.deepEqual(workspaceBounds([], [stroke, eraser]), {
+    x: -60,
+    y: -60,
+    width: 220,
+    height: 220,
+  });
+  assert.deepEqual(workspaceBounds([], [eraser]), {
+    x: 0,
+    y: 0,
+    width: 900,
+    height: 600,
+  });
+  assert.deepEqual(workspaceBounds([], [{ ...stroke, visible: false }]), {
+    x: 0,
+    y: 0,
+    width: 900,
+    height: 600,
+  });
+});
