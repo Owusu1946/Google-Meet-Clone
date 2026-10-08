@@ -115,15 +115,14 @@ export default function useWorkspace() {
     const object = objects.find((item) => item.id === id);
     if (!object) return;
     if (typeof fields.text === 'string' && Object.keys(fields).length === 1) {
-      commit(
-        textEdit(
-          id,
-          fields.text,
-          baseline || room.board.operations,
-          room.access.identity.id,
-        ),
+      const change = textEdit(
+        id,
+        fields.text,
+        baseline || room.board.operations,
+        room.access.identity.id,
       );
-      return;
+      commit(change);
+      return change.forward;
     }
     const before = Object.fromEntries(
       Object.keys(fields).map((key) => [
@@ -288,6 +287,7 @@ export default function useWorkspace() {
     canUndo: undoStack.current.length > 0,
     canRedo: redoStack.current.length > 0,
     move,
+    cancelMove: () => setDrafts({}),
     template: (name: TemplateName, x: number, y: number) =>
       createObjects(workspaceTemplate(name, room.access.identity.id, x, y)),
     room,

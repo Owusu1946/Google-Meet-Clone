@@ -87,6 +87,10 @@ export default function SmartWhiteboardOverlay({
   const workspace = useWorkspace();
   const importFile = useRef<HTMLInputElement>(null);
   const [fileError, setFileError] = useState('');
+  const [editRequest, setEditRequest] = useState<{
+    id: string;
+    revision: number;
+  }>();
   const [tool, setTool] = useState<Tool>('select');
   const [color, setColor] = useState('#202124');
   const [width, setWidth] = useState(3);
@@ -658,24 +662,19 @@ export default function SmartWhiteboardOverlay({
             </select>
           </label>
           {workspace.selected.length === 1 && (
-            <label>
-              Content{' '}
-              <input
-                aria-label="Selected object content"
-                disabled={!canDraw}
-                value={
-                  workspace.objects.find(
-                    (item) => item.id === workspace.selected[0],
-                  )?.text || ''
-                }
-                maxLength={32000}
-                onChange={(event) =>
-                  workspace.patch(workspace.selected[0], {
-                    text: event.target.value,
-                  })
-                }
-              />
-            </label>
+            <button
+              className="board-tool"
+              disabled={!canDraw}
+              onClick={() => {
+                setTool('select');
+                setEditRequest((previous) => ({
+                  id: workspace.selected[0],
+                  revision: (previous?.revision || 0) + 1,
+                }));
+              }}
+            >
+              Edit content
+            </button>
           )}
           {workspace.selected.length === 1 &&
             workspace.objects.find((item) => item.id === workspace.selected[0])
@@ -733,6 +732,7 @@ export default function SmartWhiteboardOverlay({
         />
         <WorkspaceScene
           workspace={workspace}
+          editRequest={editRequest}
           tool={tool}
           transform={transform}
           onTool={setTool}

@@ -7,6 +7,7 @@ import {
   type WorkspaceObject,
   type ObjectType,
 } from '@/lib/workspace';
+import { textDocument } from '@/lib/workspace-text';
 import { peerColor } from '@/lib/workspace-presence';
 import { frameDescendants } from '@/lib/workspace-layout';
 import { type BoardOperation, type Point, viewToWorld } from '@/lib/whiteboard';
@@ -22,11 +23,13 @@ type Gesture = {
 };
 export default function WorkspaceScene({
   workspace: model,
+  editRequest,
   tool,
   transform,
   onTool,
 }: {
   workspace: Workspace;
+  editRequest?: { id: string; revision: number };
   tool: string;
   transform: { scale: number; offset: Point };
   onTool: (tool: 'select') => void;
@@ -113,15 +116,37 @@ export default function WorkspaceScene({
   const flushText = () => {
     clearTimeout(textTimer.current);
     const pending = textPending.current;
-    if (pending)
-      model.patch(pending.id, { text: pending.text }, pending.operations);
+    if (pending) {
+      const changed =
+        model.patch(pending.id, { text: pending.text }, pending.operations) ||
+        [];
+      const merged = [...model.room.board.operations, ...changed];
+      textBaseline.current = merged;
+      setText(textDocument(pending.id, merged).text);
+    }
     textPending.current = undefined;
   };
+  const textBaseline = useRef<BoardOperation[]>(model.room.board.operations);
+  const editTarget = useRef({ objects, canEdit: model.canEdit });
+  editTarget.current = { objects, canEdit: model.canEdit };
+  useEffect(() => {
+    if (!editRequest || !editTarget.current.canEdit) return;
+    const item = editTarget.current.objects.find(
+      (object) => object.id === editRequest.id,
+    );
+    if (!item) return;
+    flushRef.current();
+    setEditing(item.id);
+    setText(item.text);
+  }, [editRequest]);
+
   const sharedText = objects.find((item) => item.id === editing)?.text;
   useEffect(() => {
-    if (editing && sharedText !== undefined && !textPending.current)
+    if (editing && sharedText !== undefined && !textPending.current) {
       setText(sharedText);
-  }, [editing, sharedText]);
+      textBaseline.current = model.room.board.operations;
+    }
+  }, [editing, sharedText, model.room.board.operations]);
   const flushRef = useRef(flushText);
   flushRef.current = flushText;
   useEffect(() => () => flushRef.current(), []);
@@ -225,10 +250,14 @@ export default function WorkspaceScene({
     if (!current) return;
     gesture.current = undefined;
     if (Math.abs(current.dx) + Math.abs(current.dy) > 0.5) {
-      if (current.resize && resize)
-        model.patch(resize.id, { width: resize.width, height: resize.height });
-      else model.move(current.originals, current.dx, current.dy, true);
-    } else model.move(current.originals, 0, 0, true);
+      if (current.resize) {
+        const original = current.originals[0];
+        model.patch(original.id, {
+          width: Math.max(80, Math.min(10000, original.width + current.dx)),
+          height: Math.max(60, Math.min(10000, original.height + current.dy)),
+        });
+      } else model.move(current.originals, current.dx, current.dy, true);
+    } else model.cancelMove();
     setResize(undefined);
   };
   return (
@@ -426,8 +455,11 @@ export default function WorkspaceScene({
                   pointerEvents: interactive ? 'auto' : 'none',
                 }}
                 onPointerDown={(event) => start(event, item)}
-                onFocus={() => {
-                  if (!model.selected.includes(item.id))
+                onFocus={(event) => {
+                  if (
+                    event.currentTarget.matches(':focus-visible') &&
+                    !model.selected.includes(item.id)
+                  )
                     model.setSelected([item.id]);
                 }}
                 onKeyDown={(event) => {
@@ -486,10 +518,13 @@ export default function WorkspaceScene({
                         text: value,
                         operations:
                           textPending.current?.operations ||
-                          model.room.board.operations,
+                          textBaseline.current,
                       };
                       clearTimeout(textTimer.current);
-                      textTimer.current = setTimeout(flushText, 200);
+                      textTimer.current = setTimeout(
+                        () => flushRef.current(),
+                        200,
+                      );
                     }}
                   />
                 ) : (
