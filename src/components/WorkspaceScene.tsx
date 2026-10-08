@@ -326,6 +326,82 @@ export default function WorkspaceScene({
     } else model.cancelMove();
     setResize(undefined);
   };
+  const renderEditor = (item: WorkspaceObject) => (
+    <textarea
+      style={
+        item.type === 'connector'
+          ? { width: '100%', height: '100%', resize: 'none', outline: 'none' }
+          : undefined
+      }
+      autoFocus
+      readOnly={!model.canEdit}
+      maxLength={32000}
+      aria-label={`Edit ${item.type}`}
+      title={
+        item.type === 'code'
+          ? 'Tab to indent, Shift+Tab to outdent, Escape to save and exit'
+          : 'Escape to save and exit'
+      }
+      value={text}
+      onPointerDown={(event) => event.stopPropagation()}
+      onKeyDown={(event) => {
+        if (event.nativeEvent.isComposing) return;
+        if (event.key === 'Escape') {
+          event.preventDefault();
+          event.stopPropagation();
+          if (flushText()) {
+            setEditing('');
+            root.current?.focus();
+          }
+        }
+        if (event.key !== 'Tab' || item.type !== 'code' || !model.canEdit)
+          return;
+        event.preventDefault();
+        event.stopPropagation();
+        const editor = event.currentTarget;
+        const next = indentCode(
+          editor.value,
+          editor.selectionStart,
+          editor.selectionEnd,
+          event.shiftKey,
+        );
+        if (next.text.length > 32000) return;
+        setText(next.text);
+        textPending.current = {
+          id: item.id,
+          text: next.text,
+          operations: textPending.current?.operations || textBaseline.current,
+        };
+        clearTimeout(textTimer.current);
+        textTimer.current = setTimeout(() => flushRef.current(), 200);
+        requestAnimationFrame(() => {
+          if (editor.isConnected)
+            editor.setSelectionRange(next.start, next.end);
+        });
+      }}
+      onBlur={() => {
+        if (flushText()) setEditing('');
+      }}
+      onChange={(event) => {
+        const value = event.target.value;
+        if (value.length > 32000) return;
+        setText(value);
+        textPending.current = {
+          id: item.id,
+          text: value,
+          operations: textPending.current?.operations || textBaseline.current,
+        };
+        clearTimeout(textTimer.current);
+        textTimer.current = setTimeout(() => flushRef.current(), 200);
+      }}
+    />
+  );
+  const editedConnector = objects.find(
+    (item) => item.id === editing && item.type === 'connector',
+  );
+  const editedEnds = editedConnector
+    ? connectorEnds(editedConnector, objects)
+    : null;
   return (
     <div
       ref={root}
@@ -448,6 +524,27 @@ export default function WorkspaceScene({
             }}
           />
         )}
+        {editedConnector && editedEnds && (
+          <div
+            className="workspace-connector-editor"
+            style={{
+              position: 'absolute',
+              zIndex: 20,
+              left: (editedEnds.from.x + editedEnds.to.x) / 2 - 140,
+              top: (editedEnds.from.y + editedEnds.to.y) / 2 - 50,
+              width: 280,
+              height: 100,
+              background: 'white',
+              border: '2px solid #2563eb',
+              borderRadius: 8,
+              padding: 8,
+              pointerEvents: 'auto',
+            }}
+            onPointerDown={(event) => event.stopPropagation()}
+          >
+            {renderEditor(editedConnector)}
+          </div>
+        )}
         <svg className="workspace-connections" aria-label="Connections">
           <defs>
             <marker
@@ -482,11 +579,26 @@ export default function WorkspaceScene({
                         model.setSelected([item.id]);
                     }}
                     onKeyDown={(event) => {
+                      if (event.key === 'F2' && model.canEdit) {
+                        event.preventDefault();
+                        event.stopPropagation();
+                        if (!flushText()) return;
+                        setEditing(item.id);
+                        setText(item.text);
+                        return;
+                      }
                       if (event.key === 'Enter' || event.key === ' ') {
                         event.preventDefault();
                         event.stopPropagation();
                         model.setSelected([item.id]);
                       }
+                    }}
+                    onDoubleClick={(event) => {
+                      if (!model.canEdit || tool !== 'select') return;
+                      event.stopPropagation();
+                      if (!flushText()) return;
+                      setEditing(item.id);
+                      setText(item.text);
                     }}
                     onPointerDown={(event) => start(event, item)}
                     className={
@@ -613,83 +725,7 @@ export default function WorkspaceScene({
                   </svg>
                 )}
                 {editing === item.id ? (
-                  <textarea
-                    autoFocus
-                    readOnly={!model.canEdit}
-                    maxLength={32000}
-                    aria-label={`Edit ${item.type}`}
-                    title={
-                      item.type === 'code'
-                        ? 'Tab to indent, Shift+Tab to outdent, Escape to save and exit'
-                        : 'Escape to save and exit'
-                    }
-                    value={text}
-                    onPointerDown={(event) => event.stopPropagation()}
-                    onKeyDown={(event) => {
-                      if (event.nativeEvent.isComposing) return;
-                      if (event.key === 'Escape') {
-                        event.preventDefault();
-                        event.stopPropagation();
-                        if (flushText()) {
-                          setEditing('');
-                          root.current?.focus();
-                        }
-                      }
-                      if (
-                        event.key !== 'Tab' ||
-                        item.type !== 'code' ||
-                        !model.canEdit
-                      )
-                        return;
-                      event.preventDefault();
-                      event.stopPropagation();
-                      const editor = event.currentTarget;
-                      const next = indentCode(
-                        editor.value,
-                        editor.selectionStart,
-                        editor.selectionEnd,
-                        event.shiftKey,
-                      );
-                      if (next.text.length > 32000) return;
-                      setText(next.text);
-                      textPending.current = {
-                        id: item.id,
-                        text: next.text,
-                        operations:
-                          textPending.current?.operations ||
-                          textBaseline.current,
-                      };
-                      clearTimeout(textTimer.current);
-                      textTimer.current = setTimeout(
-                        () => flushRef.current(),
-                        200,
-                      );
-                      requestAnimationFrame(() => {
-                        if (editor.isConnected)
-                          editor.setSelectionRange(next.start, next.end);
-                      });
-                    }}
-                    onBlur={() => {
-                      if (flushText()) setEditing('');
-                    }}
-                    onChange={(event) => {
-                      const value = event.target.value;
-                      if (value.length > 32000) return;
-                      setText(value);
-                      textPending.current = {
-                        id: item.id,
-                        text: value,
-                        operations:
-                          textPending.current?.operations ||
-                          textBaseline.current,
-                      };
-                      clearTimeout(textTimer.current);
-                      textTimer.current = setTimeout(
-                        () => flushRef.current(),
-                        200,
-                      );
-                    }}
-                  />
+                  renderEditor(item)
                 ) : (
                   <span className="workspace-object-text">{item.text}</span>
                 )}

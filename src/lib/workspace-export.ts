@@ -123,7 +123,7 @@ export function workspaceSvg(
     .map((item) => {
       const ends = connectorEnds(item, visible);
       if (!ends) return '';
-      return `<line x1="${ends.from.x}" y1="${ends.from.y}" x2="${ends.to.x}" y2="${ends.to.y}" stroke="${escape(item.color)}" stroke-width="2" marker-end="url(#arrow)"/>`;
+      return `<line x1="${ends.from.x}" y1="${ends.from.y}" x2="${ends.to.x}" y2="${ends.to.y}" stroke="${escape(item.color)}" stroke-width="2" marker-end="url(#arrow)"/>${item.text ? `<text x="${(ends.from.x + ends.to.x) / 2}" y="${(ends.from.y + ends.to.y) / 2 - 10}" text-anchor="middle" font-family="sans-serif" font-size="13" fill="#475569">${escape(item.text)}</text>` : ''}`;
     })
     .join('');
   const nodes = visible

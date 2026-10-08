@@ -28,3 +28,5 @@ Atomic commits will separate model/protocol, interaction surfaces, collaboration
 - Developer editing follow-up: 53 tests, typecheck and lint pass. Code editors support caret/multiline indentation and outdent; Escape saves and restores canvas focus without interrupting IME composition. Manual keyboard/collaboration acceptance is step 49.
 
 - Diagram keyboard follow-up: typecheck and lint pass. Pointer and keyboard connection creation share one path, and connectors expose keyboard focus, endpoint labels and selection for contextual actions. Manual acceptance is step 50. Browser interaction remains unverified.
+
+- Connector label editing follow-up: connectors now render the shared text editor, accessible via double-click, F2 or contextual Edit content; visual exports include escaped labels. Typecheck and lint pass. Manual acceptance is step 51.

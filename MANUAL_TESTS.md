@@ -111,3 +111,5 @@ Record browser/device, scenario number, expected/actual result, and console/serv
 49. Edit a code block: Tab inserts two spaces, selected lines indent together, and Shift+Tab removes indentation. A selection ending at the following line start must leave that line alone. Verify remote collaborators receive indentation edits, then press Escape to save and focus the canvas. Notes retain normal Tab navigation, and Escape during IME composition must not close the editor.
 
 50. Choose Connect, Tab to a source node and press Enter or Space, then Tab to a target and activate it. All collaborators should see the connection. Escape cancels the pending source. In Select mode, Tab to a connector: its endpoint names must be announced, it must become selected, contextual color changes and Delete must work, and Undo must restore it.
+
+51. Double-click a connector, press F2 while it is focused, or select Edit content to edit its label. Verify concurrent label writing, save on blur/Escape, Undo/Redo, remote deletion closing the editor, and label preservation in JSON/SVG/PNG exports.
