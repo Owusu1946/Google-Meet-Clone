@@ -7,6 +7,7 @@ import {
   type WorkspaceObject,
   type ObjectType,
 } from '@/lib/workspace';
+import { peerColor } from '@/lib/workspace-presence';
 import { frameDescendants } from '@/lib/workspace-layout';
 import { type Point, viewToWorld } from '@/lib/whiteboard';
 
@@ -46,6 +47,56 @@ export default function WorkspaceScene({
     width: number;
     height: number;
   }>();
+  const cursor = useRef<Point | null>(null);
+  const presenceAt = useRef(0);
+  const announceRef = useRef(() => {});
+  announceRef.current = () =>
+    model.room.board.announce({
+      point: cursor.current,
+      selected: model.selected.slice(0, 30),
+      editing: editing || null,
+    });
+  const announce = model.room.board.announce;
+  useEffect(() => {
+    const timer = setInterval(() => {
+      if (cursor.current) announceRef.current();
+    }, 2000);
+    return () => {
+      clearInterval(timer);
+      announce({ point: null, selected: [], editing: null });
+    };
+  }, [announce]);
+  const transformRef = useRef(transform);
+  transformRef.current = transform;
+  useEffect(() => {
+    const track = (event: globalThis.PointerEvent) => {
+      const rect = root.current?.getBoundingClientRect();
+      if (!rect) return;
+      if (
+        event.clientX < rect.left ||
+        event.clientX > rect.right ||
+        event.clientY < rect.top ||
+        event.clientY > rect.bottom
+      ) {
+        if (cursor.current) {
+          cursor.current = null;
+          announceRef.current();
+        }
+        return;
+      }
+      cursor.current = viewToWorld(
+        { x: event.clientX - rect.left, y: event.clientY - rect.top },
+        transformRef.current.scale,
+        transformRef.current.offset,
+      );
+      if (performance.now() - presenceAt.current > 80) {
+        presenceAt.current = performance.now();
+        announceRef.current();
+      }
+    };
+    window.addEventListener('pointermove', track);
+    return () => window.removeEventListener('pointermove', track);
+  }, []);
   const objects = model.rendered.filter((item) => item.visible);
   const interactive =
     tool === 'select' ||
@@ -116,11 +167,16 @@ export default function WorkspaceScene({
     };
   };
   const move = (event: PointerEvent) => {
+    cursor.current = world(event);
+    if (performance.now() - presenceAt.current > 80) {
+      presenceAt.current = performance.now();
+      announceRef.current();
+    }
     const current = gesture.current;
     if (!current) return;
-    const cursor = world(event);
-    current.dx = cursor.x - current.point.x;
-    current.dy = cursor.y - current.point.y;
+    const cursorPoint = world(event);
+    current.dx = cursorPoint.x - current.point.x;
+    current.dy = cursorPoint.y - current.point.y;
     if (current.resize) {
       const item = current.originals[0];
       setResize({
@@ -182,6 +238,12 @@ export default function WorkspaceScene({
         }
       }}
       onPointerMove={move}
+      onPointerLeave={() => {
+        if (!gesture.current) {
+          cursor.current = null;
+          announceRef.current();
+        }
+      }}
       onPointerUp={finish}
       onPointerCancel={finish}
       onLostPointerCapture={finish}
@@ -398,6 +460,59 @@ export default function WorkspaceScene({
             );
           })}
       </div>
+      {model.room.board.peers.map((peer) => {
+        const color = peerColor(peer.userId);
+        const point = peer.point;
+        return (
+          <div
+            key={peer.userId}
+            className="workspace-peer-layer"
+            aria-hidden="true"
+          >
+            {peer.selected.map((id) => {
+              const item = objects.find((object) => object.id === id);
+              if (!item || item.type === 'connector') return null;
+              return (
+                <div
+                  key={id}
+                  className="workspace-peer-selection"
+                  style={{
+                    left: item.x * transform.scale + transform.offset.x - 3,
+                    top: item.y * transform.scale + transform.offset.y - 3,
+                    width: item.width * transform.scale + 6,
+                    height: item.height * transform.scale + 6,
+                    borderColor: color,
+                  }}
+                >
+                  <span style={{ background: color }}>
+                    {peer.name}
+                    {peer.editing === id ? ' · writing' : ''}
+                  </span>
+                </div>
+              );
+            })}
+            {point && (
+              <div
+                className="workspace-peer-cursor"
+                style={{
+                  left: point.x * transform.scale + transform.offset.x,
+                  top: point.y * transform.scale + transform.offset.y,
+                  color,
+                }}
+              >
+                <svg width="16" height="22" viewBox="0 0 16 22">
+                  <path
+                    d="M1 1v18l5-5 4 7 3-2-4-7h6Z"
+                    fill="currentColor"
+                    stroke="white"
+                  />
+                </svg>
+                <span style={{ background: color }}>{peer.name}</span>
+              </div>
+            )}
+          </div>
+        );
+      })}
       {connectFrom && (
         <div className="workspace-hint" role="status">
           Choose another node to connect · Escape to cancel

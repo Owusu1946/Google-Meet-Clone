@@ -123,8 +123,18 @@ export default function useWorkspace() {
     setSelected([]);
   };
   const duplicate = () => {
+    const selectedIds = new Set(
+      selected.flatMap((id) =>
+        frameDescendants(id, objects).map((item) => item.id),
+      ),
+    );
     const items = objects.filter(
-      (item) => selected.includes(item.id) && item.visible,
+      (item) =>
+        item.visible &&
+        (selectedIds.has(item.id) ||
+          (item.type === 'connector' &&
+            selectedIds.has(item.from || '') &&
+            selectedIds.has(item.to || ''))),
     );
     const ids = new Map(
       items.map((item) => [
@@ -186,6 +196,8 @@ export default function useWorkspace() {
       );
       return;
     }
+    const moved = new Map(positions.map((item) => [item.id, item]));
+    const nextObjects = objects.map((item) => moved.get(item.id) || item);
     commit({
       forward: positions.map((item) => ({
         kind: 'object-patch',
@@ -193,7 +205,10 @@ export default function useWorkspace() {
         fields: {
           x: item.x,
           y: item.y,
-          parentId: containingFrame(item, objects)?.id || null,
+          parentId:
+            item.parentId && moved.has(item.parentId)
+              ? item.parentId
+              : containingFrame(item, nextObjects)?.id || null,
         },
       })),
       backward: originals.map((item) => ({

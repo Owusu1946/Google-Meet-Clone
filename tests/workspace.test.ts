@@ -173,3 +173,26 @@ test('Kanban drop targets and nested frame moves preserve membership without cyc
   columns[0].parentId = card.id; // Corrupt cyclic input cannot make traversal loop.
   assert.equal(frameDescendants(card.id, items).length, 2);
 });
+import { validPresence, peerColor } from '../src/lib/workspace-presence';
+test('presence rejects hostile cursors and unbounded selections', () => {
+  const value = {
+    point: { x: 12, y: 30 },
+    selected: [objectId],
+    editing: objectId,
+  };
+  assert.equal(validPresence(value), true);
+  assert.equal(
+    validPresence({ ...value, point: { x: Infinity, y: 0 } }),
+    false,
+  );
+  assert.equal(
+    validPresence({ ...value, selected: Array(31).fill(objectId) }),
+    false,
+  );
+  assert.equal(validPresence({ ...value, editing: '<script>' }), false);
+  assert.equal(
+    validPresence({ point: null, selected: [], editing: null }),
+    true,
+  );
+  assert.equal(peerColor(actor), peerColor(actor));
+});

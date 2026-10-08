@@ -1,3 +1,8 @@
+import {
+  validPresence,
+  type WorkspacePresence,
+  type WorkspacePeer,
+} from '@/lib/workspace-presence';
 import { useCallStateHooks } from '@stream-io/video-react-sdk';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useMeeting } from '@/contexts/MeetProvider';
@@ -18,6 +23,10 @@ export default function useWhiteboard() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [pending, setPending] = useState(0);
+  const [peers, setPeers] = useState<WorkspacePeer[]>([]);
+  const presencePending = useRef<WorkspacePresence | null>(null);
+  const presenceSending = useRef(false);
+  const peersStore = useRef(new Map<string, WorkspacePeer>());
   const liveChannel = useRef<import('stream-chat').Channel | undefined>(
     undefined,
   );
@@ -88,6 +97,7 @@ export default function useWhiteboard() {
     let cancelled = false;
     const channel = chatClient.channel(BOARD_TYPE, access.meetingId);
     liveChannel.current = channel;
+    const peerStore = peersStore.current;
     const read = (message: MessageResponse) => {
       canonicalBoardOperations(
         message.board_operations || message.board_operation,
@@ -96,6 +106,28 @@ export default function useWhiteboard() {
         message.id,
       ).forEach(accept);
     };
+    const presenceSubscription = channel.on(
+      'board_presence' as EventTypes,
+      (event) => {
+        if (
+          cancelled ||
+          !event.user?.id ||
+          event.user.id === access.identity.id ||
+          !validPresence(event.presence)
+        )
+          return;
+        if (peerStore.size >= 200 && !peerStore.has(event.user.id)) return;
+        if (!event.presence.point) peerStore.delete(event.user.id);
+        else
+          peerStore.set(event.user.id, {
+            ...event.presence,
+            userId: event.user.id,
+            name: (event.user.name || 'Participant').slice(0, 80),
+            seen: Date.now(),
+          });
+        setPeers([...peerStore.values()]);
+      },
+    );
     const previews = channel.on('board_preview' as EventTypes, (event) => {
       if (
         cancelled ||
@@ -139,6 +171,13 @@ export default function useWhiteboard() {
       if (!cancelled && event.message) read(event.message);
     });
     const expiry = setInterval(() => {
+      let peersChanged = false;
+      for (const [id, peer] of peerStore)
+        if (Date.now() - peer.seen > 10000) {
+          peerStore.delete(id);
+          peersChanged = true;
+        }
+      if (peersChanged && !cancelled) setPeers([...peerStore.values()]);
       let changed = false;
       for (const [id, value] of previewsStore.current) {
         if (
@@ -198,6 +237,9 @@ export default function useWhiteboard() {
       cancelled = true;
       liveChannel.current = undefined;
       previews.unsubscribe();
+      presenceSubscription.unsubscribe();
+      peerStore.clear();
+      setPeers([]);
       clearInterval(expiry);
       subscription.unsubscribe();
       recovered.unsubscribe();
@@ -207,6 +249,7 @@ export default function useWhiteboard() {
     chatClient,
     chatError,
     access.meetingId,
+    access.identity.id,
     custom.collaboration,
     access.hostId,
     accept,
@@ -288,6 +331,31 @@ export default function useWhiteboard() {
       }
     })();
   }, []);
+  const announce = useCallback((presence: WorkspacePresence) => {
+    if (!validPresence(presence) || !liveChannel.current) return;
+    presencePending.current = presence;
+    if (presenceSending.current) return;
+    presenceSending.current = true;
+    void (async () => {
+      try {
+        while (
+          mounted.current &&
+          liveChannel.current &&
+          presencePending.current
+        ) {
+          const next = presencePending.current;
+          presencePending.current = null;
+          await liveChannel.current
+            .sendEvent({ type: 'board_presence' as EventTypes, presence: next })
+            .catch(() => undefined);
+          if (presencePending.current)
+            await new Promise((resolve) => setTimeout(resolve, 80));
+        }
+      } finally {
+        presenceSending.current = false;
+      }
+    })();
+  }, []);
   const send = useCallback(
     (
       input:
@@ -320,6 +388,8 @@ export default function useWhiteboard() {
   }, []);
   return {
     operations,
+    peers,
+    announce,
     previewChange: (input: Record<string, unknown>) => {
       const operation = {
         ...input,
