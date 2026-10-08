@@ -4,6 +4,7 @@ import { useEffect, useRef, useState, type PointerEvent } from 'react';
 import type useWorkspace from '@/hooks/useWorkspace';
 import {
   connectorEnds,
+  connectorGeometry,
   OBJECT_TYPES,
   type WorkspaceObject,
   type ObjectType,
@@ -563,10 +564,10 @@ export default function WorkspaceScene({
             {objects
               .filter((item) => item.type === 'connector')
               .map((item) => {
-                const ends = connectorEnds(item, objects);
+                const ends = connectorGeometry(item, objects);
                 if (!ends) return null;
-                const midX = (ends.from.x + ends.to.x) / 2;
-                const path = `M${ends.from.x},${ends.from.y} C${midX},${ends.from.y} ${midX},${ends.to.y} ${ends.to.x},${ends.to.y}`;
+                const midX = ends.x;
+                const path = ends.path;
                 return (
                   <g
                     key={item.id}

@@ -30,3 +30,5 @@ Atomic commits will separate model/protocol, interaction surfaces, collaboration
 - Diagram keyboard follow-up: typecheck and lint pass. Pointer and keyboard connection creation share one path, and connectors expose keyboard focus, endpoint labels and selection for contextual actions. Manual acceptance is step 50. Browser interaction remains unverified.
 
 - Connector label editing follow-up: connectors now render the shared text editor, accessible via double-click, F2 or contextual Edit content; visual exports include escaped labels. Typecheck and lint pass. Manual acceptance is step 51.
+
+- Diagram export fidelity: 54 automated tests, typecheck and lint pass. Live and exported connectors share cubic geometry; regression coverage includes escaped labels and hidden endpoints. Manual acceptance is step 52.

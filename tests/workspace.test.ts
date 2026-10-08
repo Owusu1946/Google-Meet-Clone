@@ -1,3 +1,4 @@
+import { connectorGeometry } from '../src/lib/workspace';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
@@ -511,4 +512,19 @@ test('Fit and export bounds include ink width but ignore remote eraser-only exte
     width: 900,
     height: 600,
   });
+});
+
+test('diagram exports preserve live connector curves and safely escaped labels', () => {
+  const items = workspaceTemplate('Architecture', actor, 0, 0);
+  const connector = items.find((item) => item.type === 'connector')!;
+  connector.text = '<request & response>';
+  const geometry = connectorGeometry(connector, items)!;
+  assert.ok(geometry.path.includes(' C'));
+  const exported = workspaceSvg(items, []);
+  assert.ok(exported.includes(`d="${geometry.path}"`));
+  assert.ok(exported.includes('&lt;request &amp; response&gt;'));
+  assert.equal(exported.includes('<request'), false);
+  items.find((item) => item.id === connector.to)!.visible = false;
+  assert.equal(connectorGeometry(connector, items), null);
+  assert.equal(workspaceSvg(items, []).includes('&lt;request'), false);
 });

@@ -219,6 +219,22 @@ export function connectorEnds(
   };
 }
 
+export function connectorGeometry(
+  object: WorkspaceObject,
+  objects: WorkspaceObject[],
+) {
+  const ends = connectorEnds(object, objects);
+  if (!ends) return null;
+  const x = (ends.from.x + ends.to.x) / 2;
+  const y = (ends.from.y + ends.to.y) / 2;
+  return {
+    ...ends,
+    x,
+    y,
+    path: `M${ends.from.x},${ends.from.y} C${x},${ends.from.y} ${x},${ends.to.y} ${ends.to.x},${ends.to.y}`,
+  };
+}
+
 export function textSeed(text: string) {
   return [...text].slice(0, 400).join('');
 }
