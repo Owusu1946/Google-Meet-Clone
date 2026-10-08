@@ -373,12 +373,7 @@ export default function WorkspaceScene({
         if (delta[event.key]) {
           event.preventDefault();
           const amount = event.shiftKey ? 10 : 1;
-          model.move(
-            movableSelection(model.selected, objects),
-            delta[event.key].x * amount,
-            delta[event.key].y * amount,
-            true,
-          );
+          model.nudge(delta[event.key].x * amount, delta[event.key].y * amount);
         }
       }}
     >

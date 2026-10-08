@@ -19,6 +19,9 @@ import {
 } from '@/lib/workspace';
 import {
   frameDescendants,
+  kanbanLayout,
+  kanbanDrop,
+  kanbanReorder,
   containingFrame,
   workspaceTemplate,
   type TemplateName,
@@ -30,10 +33,11 @@ type Change = {
 };
 export default function useWorkspace() {
   const room = useRoom();
-  const objects = useMemo(
+  const storedObjects = useMemo(
     () => workspaceObjects(room.board.operations),
     [room.board.operations],
   );
+  const objects = useMemo(() => kanbanLayout(storedObjects), [storedObjects]);
   const [selected, setSelected] = useState<string[]>([]);
   const [drafts, setDrafts] = useState<Record<string, Partial<ObjectFields>>>(
     {},
@@ -112,7 +116,7 @@ export default function useWorkspace() {
     fields: Partial<ObjectFields>,
     baseline?: BoardOperation[],
   ) => {
-    const object = objects.find((item) => item.id === id);
+    const object = storedObjects.find((item) => item.id === id);
     if (!object) return;
     if (typeof fields.text === 'string' && Object.keys(fields).length === 1) {
       const change = textEdit(
@@ -252,22 +256,82 @@ export default function useWorkspace() {
       forward: positions.map((item) => ({
         kind: 'object-patch',
         objectId: item.id,
-        fields: {
-          x: item.x,
-          y: item.y,
-          parentId:
-            item.parentId && moved.has(item.parentId)
-              ? item.parentId
-              : containingFrame(item, nextObjects)?.id || null,
-        },
+        fields:
+          item.type === 'card' && !(item.parentId && moved.has(item.parentId))
+            ? kanbanDrop(item, storedObjects, nextObjects)
+            : {
+                x: item.x,
+                y: item.y,
+                parentId:
+                  item.parentId && moved.has(item.parentId)
+                    ? item.parentId
+                    : containingFrame(item, nextObjects)?.id || null,
+              },
       })),
-      backward: originals.map((item) => ({
-        kind: 'object-patch',
-        objectId: item.id,
-        fields: { x: item.x, y: item.y, parentId: item.parentId },
-      })),
+      backward: originals.map((item) => {
+        const previous =
+          storedObjects.find((object) => object.id === item.id) || item;
+        return {
+          kind: 'object-patch' as const,
+          objectId: item.id,
+          fields: { x: previous.x, y: previous.y, parentId: previous.parentId },
+        };
+      }),
     });
     setDrafts({});
+  };
+  const nudge = (dx: number, dy: number) => {
+    const items = objects.filter(
+      (item) => selected.includes(item.id) && item.visible,
+    );
+    const card =
+      items.length === 1 && items[0].type === 'card' ? items[0] : undefined;
+    const column =
+      card &&
+      objects.find(
+        (item) => item.id === card.parentId && item.type === 'column',
+      );
+    if (card && column) {
+      if (dy) {
+        const reordered = kanbanReorder(card, dy, storedObjects);
+        commit({
+          forward: reordered.map((item) => ({
+            kind: 'object-patch',
+            objectId: item.id,
+            fields: { y: item.y },
+          })),
+          backward: reordered.map((item) => ({
+            kind: 'object-patch',
+            objectId: item.id,
+            fields: {
+              y: storedObjects.find((object) => object.id === item.id)!.y,
+            },
+          })),
+        });
+      } else if (dx) {
+        const columns = objects
+          .filter((item) => item.visible && item.type === 'column')
+          .sort((a, b) => a.x - b.x || a.id.localeCompare(b.id));
+        const target =
+          columns[
+            columns.findIndex((item) => item.id === column.id) + Math.sign(dx)
+          ];
+        if (target)
+          move([card], target.x + 20 - card.x, target.y + 70 - card.y, true);
+      }
+      return;
+    }
+    const ids = new Set(
+      selected.flatMap((id) =>
+        frameDescendants(id, objects).map((item) => item.id),
+      ),
+    );
+    move(
+      objects.filter((item) => ids.has(item.id) && item.type !== 'connector'),
+      dx,
+      dy,
+      true,
+    );
   };
   // Expose history changes without making the stacks themselves React state.
   void historyVersion;
@@ -287,6 +351,7 @@ export default function useWorkspace() {
     canUndo: undoStack.current.length > 0,
     canRedo: redoStack.current.length > 0,
     move,
+    nudge,
     cancelMove: () => setDrafts({}),
     template: (name: TemplateName, x: number, y: number) =>
       createObjects(workspaceTemplate(name, room.access.identity.id, x, y)),

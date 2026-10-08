@@ -369,3 +369,91 @@ test('keyboard and pointer movement include nested contents exactly once without
     false,
   );
 });
+
+import { kanbanLayout, kanbanDrop } from '../src/lib/workspace-layout';
+
+test('concurrent Kanban drops derive one deterministic non-overlapping order', () => {
+  const raw = workspaceTemplate('Kanban', actor, 0, 0);
+  const columns = raw.filter((item) => item.type === 'column');
+  const cards = raw.filter((item) => item.type === 'card');
+  cards.forEach((item) => {
+    item.parentId = columns[1].id;
+    item.y = 100;
+  });
+  const layout = kanbanLayout(raw);
+  const reversed = kanbanLayout([...raw].reverse());
+  for (const card of cards)
+    assert.deepEqual(
+      layout.find((item) => item.id === card.id),
+      reversed.find((item) => item.id === card.id),
+    );
+  const ordered = layout
+    .filter((item) => item.type === 'card')
+    .sort((a, b) => a.y - b.y);
+  for (let index = 1; index < ordered.length; index++)
+    assert.ok(
+      ordered[index].y >= ordered[index - 1].y + ordered[index - 1].height + 16,
+    );
+  assert.equal(ordered[0].x, columns[1].x + 20);
+  assert.equal(ordered[0].width, columns[1].width - 40);
+});
+
+test('Kanban drops insert between displayed cards using stored ordering and preserve free placement outside columns', () => {
+  const raw = workspaceTemplate('Kanban', actor, 0, 0);
+  const columns = raw.filter((item) => item.type === 'column');
+  const cards = raw.filter((item) => item.type === 'card');
+  cards[0].parentId = columns[0].id;
+  cards[0].y = 10;
+  cards[1].parentId = columns[0].id;
+  cards[1].y = 20;
+  const displayed = kanbanLayout(raw);
+  const first = displayed.find((item) => item.id === cards[0].id)!;
+  const drop = { ...cards[2], x: first.x, y: first.y + first.height / 2 + 8 };
+  const patch = kanbanDrop(drop, raw, displayed);
+  assert.equal(patch.parentId, columns[0].id);
+  assert.equal(patch.y, 15);
+  const merged = raw.map((item) =>
+    item.id === drop.id ? { ...item, ...patch } : item,
+  );
+  const ordered = kanbanLayout(merged)
+    .filter((item) => item.type === 'card')
+    .sort((a, b) => a.y - b.y);
+  assert.deepEqual(
+    ordered.map((item) => item.id),
+    [cards[0].id, cards[2].id, cards[1].id],
+  );
+  assert.deepEqual(kanbanDrop({ ...drop, x: -500, y: -300 }, raw, displayed), {
+    x: -500,
+    y: -300,
+    parentId: null,
+  });
+});
+
+import { kanbanReorder } from '../src/lib/workspace-layout';
+test('keyboard Kanban reorder resolves tied ranks and produces bounded patches', () => {
+  const raw = workspaceTemplate('Kanban', actor, 0, 0);
+  const column = raw.find((item) => item.type === 'column')!;
+  const cards = raw.filter((item) => item.type === 'card');
+  cards.forEach((item) => {
+    item.parentId = column.id;
+    item.y = 100000;
+  });
+  const before = kanbanLayout(raw)
+    .filter((item) => item.type === 'card')
+    .sort((a, b) => a.y - b.y);
+  const patches = kanbanReorder(before[0], 1, raw);
+  const after = kanbanLayout(
+    raw.map((item) => ({
+      ...item,
+      ...patches.find((patch) => patch.id === item.id),
+    })),
+  )
+    .filter((item) => item.type === 'card')
+    .sort((a, b) => a.y - b.y);
+  assert.deepEqual(
+    after.map((item) => item.id),
+    [before[1].id, before[0].id, before[2].id],
+  );
+  assert.ok(patches.every((patch) => patch.y >= 0 && patch.y <= 100000));
+  assert.deepEqual(kanbanReorder(before[0], -1, raw), []);
+});
