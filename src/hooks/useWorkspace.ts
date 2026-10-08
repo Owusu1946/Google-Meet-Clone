@@ -1,21 +1,18 @@
 'use client';
-import type { BoardInput } from '@/lib/board-input';
 import {
-  textEdit,
-  insertedAtomIds,
-  type TextMutation,
-} from '@/lib/workspace-text';
-import type { BoardOperation } from '@/lib/whiteboard';
+  workspaceCreation,
+  workspaceRedo,
+  type WorkspaceChange,
+} from '@/lib/workspace-changes';
+import { textEdit } from '@/lib/workspace-text';
+import type { BoardOperation, BoardStroke } from '@/lib/whiteboard';
 import { useCallback, useMemo, useRef, useState } from 'react';
 import { useRoom } from '@/contexts/MeetingRoomContext';
 import {
   workspaceObjects,
   newObject,
-  objectFields,
-  textSeed,
   type ObjectFields,
   type ObjectType,
-  type WorkspaceMutation,
   type WorkspaceObject,
 } from '@/lib/workspace';
 import {
@@ -29,10 +26,6 @@ import {
   type TemplateName,
 } from '@/lib/workspace-layout';
 
-type Change = {
-  forward: (WorkspaceMutation | TextMutation | BoardOperation)[];
-  backward: (WorkspaceMutation | TextMutation)[];
-};
 export default function useWorkspace() {
   const room = useRoom();
   const storedObjects = useMemo(
@@ -44,56 +37,35 @@ export default function useWorkspace() {
   const [drafts, setDrafts] = useState<Record<string, Partial<ObjectFields>>>(
     {},
   );
-  const undoStack = useRef<Change[]>([]);
-  const redoStack = useRef<Change[]>([]);
+  const undoStack = useRef<WorkspaceChange[]>([]);
+  const redoStack = useRef<WorkspaceChange[]>([]);
   const [historyVersion, setHistoryVersion] = useState(0);
   const canEdit =
     room.board.available &&
     !room.board.loading &&
     (room.access.isHost || room.custom.collaboration !== false);
   const commit = useCallback(
-    (change: Change) => {
-      if (!canEdit || !change.forward.length) return;
-      if (!room.board.sendMany(change.forward)) return;
+    (change: WorkspaceChange) => {
+      if (!canEdit || !change.forward.length) return false;
+      if (!room.board.sendMany(change.forward)) return false;
       undoStack.current.push(change);
       if (undoStack.current.length > 100) undoStack.current.shift();
       redoStack.current = [];
       setHistoryVersion((value) => value + 1);
+      return true;
     },
     [canEdit, room.board],
   );
-  const createObjects = (items: WorkspaceObject[]) => {
-    const creates: BoardOperation[] = items.map((item) => ({
-      id: crypto.randomUUID(),
-      actor: room.access.identity.id,
-      time: new Date().toISOString(),
-      kind: 'object-create',
-      objectId: item.id,
-      objectType: item.type,
-      fields: { ...objectFields(item), text: textSeed(item.text) },
-    }));
-    const forward: BoardOperation[] = [...creates];
-    items.forEach((item, index) =>
-      forward.push(
-        ...textEdit(
-          item.id,
-          item.text,
-          [creates[index]],
-          room.access.identity.id,
-        ).forward,
-      ),
-    );
-    commit({
-      forward,
-      backward: items.map((item) => ({
-        kind: 'object-visible',
-        objectId: item.id,
-        visible: false,
-      })),
-    });
+  const createObjects = (
+    items: WorkspaceObject[],
+    strokes: Pick<BoardStroke, 'mode' | 'color' | 'width' | 'points'>[] = [],
+  ) => {
+    if (!commit(workspaceCreation(items, room.access.identity.id, strokes)))
+      return false;
     setSelected(
       items.filter((item) => item.type !== 'connector').map((item) => item.id),
     );
+    return true;
   };
   const create = (
     type: ObjectType,
@@ -225,24 +197,7 @@ export default function useWorkspace() {
     if (!canEdit) return;
     const change = redoStack.current.pop();
     if (!change) return;
-    const replay: BoardInput[] = [];
-    change.forward.forEach((op) => {
-      if (op.kind === 'text-insert' && 'id' in op) {
-        const ids = insertedAtomIds(op.id, op.text);
-        for (let index = 0; index < ids.length; index += 12)
-          replay.push({
-            kind: 'text-visible',
-            objectId: op.objectId,
-            atomIds: ids.slice(index, index + 12),
-            visible: true,
-          });
-      } else
-        replay.push(
-          op.kind === 'object-create'
-            ? { kind: 'object-visible', objectId: op.objectId, visible: true }
-            : { ...op, id: crypto.randomUUID() },
-        );
-    });
+    const replay = workspaceRedo(change);
     if (!room.board.sendMany(replay)) {
       redoStack.current.push(change);
       return;

@@ -1,5 +1,4 @@
 'use client';
-import type { BoardInput } from '@/lib/board-input';
 import {
   useCallback,
   useEffect,
@@ -79,16 +78,8 @@ export default function SmartWhiteboardOverlay({
   const { access } = useMeeting();
   const { useCallCustomData } = useCallStateHooks();
   const custom = useCallCustomData();
-  const {
-    operations,
-    send,
-    sendMany,
-    loading,
-    error,
-    pending,
-    retry,
-    available,
-  } = useRoom().board;
+  const { operations, send, loading, error, pending, retry, available } =
+    useRoom().board;
   const room = useRoom();
   const canDraw =
     available && !loading && (access.isHost || custom.collaboration !== false);
@@ -537,29 +528,10 @@ export default function SmartWhiteboardOverlay({
                 await file.text(),
                 access.identity.id,
               );
-              workspace.createObjects(snapshot.objects);
-              const importedInk: BoardInput[] = [];
-              for (const stroke of snapshot.strokes) {
-                const strokeId = `${access.identity.id}:${crypto.randomUUID()}`;
-                for (
-                  let segment = 0;
-                  segment * 80 < stroke.points.length;
-                  segment++
-                )
-                  importedInk.push({
-                    kind: 'stroke',
-                    strokeId,
-                    segment,
-                    points: stroke.points.slice(
-                      segment * 80,
-                      (segment + 1) * 80,
-                    ),
-                    mode: stroke.mode,
-                    color: stroke.color,
-                    width: stroke.width,
-                  });
-              }
-              sendMany(importedInk);
+              if (!workspace.createObjects(snapshot.objects, snapshot.strokes))
+                throw new Error(
+                  'The workspace could not be imported. Check editing access and retry.',
+                );
               setTool('select');
             } catch (failure) {
               setFileError(
