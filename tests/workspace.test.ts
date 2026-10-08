@@ -134,3 +134,42 @@ test('connectors follow moved endpoints and disappear when an endpoint is delete
   first.visible = false;
   assert.equal(connectorEnds(connector, objects), null);
 });
+import {
+  WORKSPACE_TEMPLATES,
+  workspaceTemplate,
+  containingFrame,
+  frameDescendants,
+} from '../src/lib/workspace-layout';
+test('domain templates generate valid linked objects within service limits', () => {
+  for (const name of WORKSPACE_TEMPLATES) {
+    const items = workspaceTemplate(name, actor, 30, 40);
+    assert.ok(items.length > 0);
+    for (const item of items) {
+      const { id, type, actor: owner, visible, ...fields } = item;
+      assert.equal(owner, actor);
+      assert.equal(visible, true);
+      const op = operation({
+        kind: 'object-create',
+        objectId: id,
+        objectType: type,
+        fields,
+      });
+      assert.equal(validOperation(op), true, `${name}: ${type}`);
+      assert.equal(boardBatch([op]).length, 1);
+      if (item.from) assert.ok(items.some((node) => node.id === item.from));
+      if (item.to) assert.ok(items.some((node) => node.id === item.to));
+      if (item.parentId)
+        assert.ok(items.some((node) => node.id === item.parentId));
+    }
+  }
+});
+test('Kanban drop targets and nested frame moves preserve membership without cycles', () => {
+  const items = workspaceTemplate('Kanban', actor, 0, 0);
+  const card = items.find((item) => item.type === 'card')!;
+  const columns = items.filter((item) => item.type === 'column');
+  assert.equal(containingFrame({ ...card, x: 340 }, items)?.id, columns[1].id);
+  assert.equal(frameDescendants(columns[0].id, items).length, 2);
+  assert.equal(containingFrame(columns[0], items), undefined);
+  columns[0].parentId = card.id; // Corrupt cyclic input cannot make traversal loop.
+  assert.equal(frameDescendants(card.id, items).length, 2);
+});

@@ -320,6 +320,19 @@ export default function useWhiteboard() {
   }, []);
   return {
     operations,
+    previewChange: (input: Record<string, unknown>) => {
+      const operation = {
+        ...input,
+        id: crypto.randomUUID(),
+        actor: access.identity.id,
+        time: new Date().toISOString(),
+      };
+      if (
+        validOperation(operation) &&
+        (access.isHost || custom.collaboration !== false)
+      )
+        preview(operation);
+    },
     send,
     loading,
     error,

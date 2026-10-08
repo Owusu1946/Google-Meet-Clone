@@ -20,8 +20,12 @@ import {
 } from '@/lib/whiteboard';
 import Dialog from './Dialog';
 import Close from './icons/Close';
+import useWorkspace from '@/hooks/useWorkspace';
+import WorkspaceScene from './WorkspaceScene';
+import { WORKSPACE_TEMPLATES } from '@/lib/workspace-layout';
+import { OBJECT_TYPES, type ObjectType } from '@/lib/workspace';
 
-type Tool = StrokeMode | 'pan';
+type Tool = StrokeMode | 'pan' | 'select' | 'connect' | ObjectType;
 function paint(
   ctx: CanvasRenderingContext2D,
   strokes: BoardStroke[],
@@ -74,7 +78,8 @@ export default function SmartWhiteboardOverlay({
   const canDraw =
     available && !loading && (access.isHost || custom.collaboration !== false);
   const canvas = useRef<HTMLCanvasElement>(null);
-  const [tool, setTool] = useState<Tool>('pen');
+  const workspace = useWorkspace();
+  const [tool, setTool] = useState<Tool>('select');
   const [color, setColor] = useState('#202124');
   const [width, setWidth] = useState(3);
   const [transform, setTransform] = useState({
@@ -187,11 +192,11 @@ export default function SmartWhiteboardOverlay({
       pan.current = { point: position, offset: transform.offset };
       return;
     }
-    if (!canDraw) return;
+    if (!canDraw || !['pen', 'highlighter', 'eraser'].includes(tool)) return;
     active.current = {
       id: `${access.identity.id}:${crypto.randomUUID()}`,
       actor: access.identity.id,
-      mode: tool,
+      mode: tool as StrokeMode,
       width: Math.min(
         40,
         tool === 'highlighter'
@@ -251,7 +256,7 @@ export default function SmartWhiteboardOverlay({
     pan.current = undefined;
   };
   useEffect(() => {
-    const element = canvas.current;
+    const element = canvas.current?.parentElement;
     if (!open || !element) return;
     const wheel = (event: WheelEvent) => {
       if (!event.ctrlKey && !event.metaKey) return;
@@ -319,7 +324,9 @@ export default function SmartWhiteboardOverlay({
     <section className="whiteboard" aria-label="Shared whiteboard">
       <header className="p-3 flex flex-wrap gap-2 items-center bg-white border-b border-hairline-gray">
         <span className="text-sm font-medium mr-2">Whiteboard</span>
-        {(['pen', 'highlighter', 'eraser', 'pan'] as const).map((value) => (
+        {(
+          ['select', 'pen', 'highlighter', 'eraser', 'pan', 'connect'] as const
+        ).map((value) => (
           <button
             key={value}
             aria-pressed={tool === value}
@@ -330,6 +337,51 @@ export default function SmartWhiteboardOverlay({
             {value === 'pan' ? 'Move' : value[0].toUpperCase() + value.slice(1)}
           </button>
         ))}
+        <select
+          className="board-tool"
+          aria-label="Add to workspace"
+          value={OBJECT_TYPES.includes(tool as ObjectType) ? tool : ''}
+          disabled={!canDraw}
+          onChange={(event) => setTool(event.target.value as Tool)}
+        >
+          <option value="" disabled>
+            Add object�
+          </option>
+          {OBJECT_TYPES.filter((value) => value !== 'connector').map(
+            (value) => (
+              <option key={value} value={value}>
+                {value[0].toUpperCase() + value.slice(1)}
+              </option>
+            ),
+          )}
+        </select>
+        <select
+          className="board-tool"
+          aria-label="Insert workspace template"
+          value=""
+          disabled={!canDraw}
+          onChange={(event) => {
+            const name = WORKSPACE_TEMPLATES.find(
+              (value) => value === event.target.value,
+            );
+            if (name) {
+              const point = viewToWorld(
+                { x: 40, y: 40 },
+                transform.scale,
+                transform.offset,
+              );
+              workspace.template(name, point.x, point.y);
+              setTool('select');
+            }
+          }}
+        >
+          <option value="" disabled>
+            Templates�
+          </option>
+          {WORKSPACE_TEMPLATES.map((name) => (
+            <option key={name}>{name}</option>
+          ))}
+        </select>
         <input
           aria-label="Drawing color"
           type="color"
@@ -353,20 +405,36 @@ export default function SmartWhiteboardOverlay({
         </label>
         <button
           className="board-tool"
-          disabled={!lastOwn || !canDraw}
+          disabled={
+            !canDraw || (tool === 'select' ? !workspace.canUndo : !lastOwn)
+          }
           onClick={() =>
-            lastOwn &&
-            send({ kind: 'visibility', strokeId: lastOwn.id, visible: false })
+            tool === 'select'
+              ? workspace.undo()
+              : lastOwn &&
+                send({
+                  kind: 'visibility',
+                  strokeId: lastOwn.id,
+                  visible: false,
+                })
           }
         >
           Undo
         </button>
         <button
           className="board-tool"
-          disabled={!lastHidden || !canDraw}
+          disabled={
+            !canDraw || (tool === 'select' ? !workspace.canRedo : !lastHidden)
+          }
           onClick={() =>
-            lastHidden &&
-            send({ kind: 'visibility', strokeId: lastHidden.id, visible: true })
+            tool === 'select'
+              ? workspace.redo()
+              : lastHidden &&
+                send({
+                  kind: 'visibility',
+                  strokeId: lastHidden.id,
+                  visible: true,
+                })
           }
         >
           Redo
@@ -400,18 +468,89 @@ export default function SmartWhiteboardOverlay({
           </button>
         )}
       </header>
-      <div className="flex-1 min-h-0 relative bg-white">
+      {workspace.selected.length > 0 && (
+        <div className="workspace-contextbar">
+          <span>{workspace.selected.length} selected</span>
+          <button
+            className="board-tool"
+            disabled={!canDraw}
+            onClick={workspace.duplicate}
+          >
+            Duplicate
+          </button>
+          <button
+            className="board-tool"
+            disabled={!canDraw}
+            onClick={workspace.remove}
+          >
+            Delete
+          </button>
+          <label>
+            Fill{' '}
+            <input
+              aria-label="Selected object color"
+              type="color"
+              disabled={!canDraw}
+              value={
+                workspace.objects.find(
+                  (item) => item.id === workspace.selected[0],
+                )?.color || '#ffffff'
+              }
+              onChange={(event) =>
+                workspace.selected.forEach((id) =>
+                  workspace.patch(id, { color: event.target.value }),
+                )
+              }
+            />
+          </label>
+          <label>
+            Text size{' '}
+            <select
+              aria-label="Selected text size"
+              disabled={!canDraw}
+              value={
+                workspace.objects.find(
+                  (item) => item.id === workspace.selected[0],
+                )?.fontSize || 18
+              }
+              onChange={(event) =>
+                workspace.selected.forEach((id) =>
+                  workspace.patch(id, { fontSize: Number(event.target.value) }),
+                )
+              }
+            >
+              {[12, 14, 18, 24, 32, 48, 64].map((size) => (
+                <option key={size}>{size}</option>
+              ))}
+            </select>
+          </label>
+          <span>Double-click to edit � Shift-click to select more</span>
+        </div>
+      )}
+      <div className="flex-1 min-h-0 relative workspace-viewport">
         <canvas
           ref={canvas}
           className="absolute inset-0 w-full h-full touch-none"
           style={{
             cursor: tool === 'pan' ? 'grab' : canDraw ? 'crosshair' : 'default',
+            pointerEvents: ['pen', 'highlighter', 'eraser', 'pan'].includes(
+              tool,
+            )
+              ? 'auto'
+              : 'none',
+            zIndex: ['pen', 'highlighter', 'eraser'].includes(tool) ? 3 : 0,
           }}
           onPointerDown={down}
           onPointerMove={move}
           onPointerUp={end}
           onPointerCancel={end}
           onLostPointerCapture={end}
+        />
+        <WorkspaceScene
+          workspace={workspace}
+          tool={tool}
+          transform={transform}
+          onTool={setTool}
         />
       </div>
       <footer className="px-4 py-2 text-xs bg-light-gray flex justify-between gap-3">
